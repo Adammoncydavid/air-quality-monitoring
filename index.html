@@ -5,44 +5,223 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Air Quality Monitoring System</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .dashboard {
+            display: grid;
+            gap: 2rem;
+        }
+
+        /* Status Cards */
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .aqi-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+
+        .good { color: #27ae60; }
+        .moderate { color: #f39c12; }
+        .poor { color: #e74c3c; }
+
+        .value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0.5rem 0;
+        }
+
+        /* Map Section */
+        .map-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        #map {
+            height: 400px;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        /* Charts Section */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Sensor List */
+        .sensor-list {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .sensor-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+        }
+
+        .sensor-item.good { border-left-color: #27ae60; }
+        .sensor-item.moderate { border-left-color: #f39c12; }
+        .sensor-item.poor { border-left-color: #e74c3c; }
+
+        .sensor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .sensor-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .sensor-aqi {
+            font-weight: bold;
+        }
+
+        .update-indicator {
+            background: #3498db;
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
 </head>
 <body>
     <header>
         <h1>🌍 Air Quality Monitoring System</h1>
-        <p>Real-time environmental data tracking</p>
+        <p>Real-time environmental data tracking | <span id="lastUpdate">Updating...</span></p>
     </header>
 
     <div class="container">
-        <!-- Main Dashboard -->
         <div class="dashboard">
             <!-- Current Status Cards -->
             <div class="status-cards">
                 <div class="card">
                     <h3>Overall AQI</h3>
-                    <div class="aqi-value good">45</div>
-                    <p>Good</p>
+                    <div class="aqi-value good" id="mainAqi">45</div>
+                    <p id="mainStatus">Good</p>
                 </div>
                 <div class="card">
                     <h3>PM2.5</h3>
-                    <div class="value">12 μg/m³</div>
-                    <p>Moderate</p>
+                    <div class="value" id="pm25Value">12 μg/m³</div>
+                    <p id="pm25Status">Moderate</p>
                 </div>
                 <div class="card">
                     <h3>Temperature</h3>
-                    <div class="value">24°C</div>
-                    <p>Comfortable</p>
+                    <div class="value" id="tempValue">24°C</div>
+                    <p id="tempStatus">Comfortable</p>
                 </div>
                 <div class="card">
                     <h3>Humidity</h3>
-                    <div class="value">65%</div>
-                    <p>Normal</p>
+                    <div class="value" id="humidityValue">65%</div>
+                    <p id="humidityStatus">Normal</p>
                 </div>
             </div>
 
             <!-- Map Section -->
             <div class="map-section">
-                <h2>Live Sensor Map</h2>
+                <h2>Live Sensor Map <span class="update-indicator">LIVE</span></h2>
                 <div id="map"></div>
             </div>
 
@@ -60,7 +239,7 @@
 
             <!-- Sensor List -->
             <div class="sensor-list">
-                <h3>Active Sensors</h3>
+                <h3>Active Sensors <span class="update-indicator">REAL-TIME</span></h3>
                 <div id="sensorGrid" class="sensor-grid">
                     <!-- Sensors will be loaded here by JavaScript -->
                 </div>
@@ -71,7 +250,376 @@
     <!-- JavaScript Libraries -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="data/dummy-data.js"></script>
-    <script src="script.js"></script>
+    
+    <script>
+        // DUMMY DATA - This will change dynamically
+        let dummySensors = [
+            {
+                id: 1,
+                name: "Central Park Sensor",
+                lat: 40.785091,
+                lng: -73.968285,
+                aqi: 35,
+                pm25: 8,
+                pm10: 15,
+                temperature: 22,
+                humidity: 60,
+                status: "good",
+                lastUpdate: new Date().toISOString()
+            },
+            {
+                id: 2,
+                name: "Downtown Station",
+                lat: 40.7589,
+                lng: -73.9851,
+                aqi: 68,
+                pm25: 25,
+                pm10: 45,
+                temperature: 26,
+                humidity: 55,
+                status: "moderate",
+                lastUpdate: new Date().toISOString()
+            },
+            {
+                id: 3,
+                name: "Industrial Area",
+                lat: 40.7282,
+                lng: -74.0776,
+                aqi: 120,
+                pm25: 45,
+                pm10: 80,
+                temperature: 24,
+                humidity: 70,
+                status: "poor",
+                lastUpdate: new Date().toISOString()
+            },
+            {
+                id: 4,
+                name: "Residential Zone",
+                lat: 40.7505,
+                lng: -73.9934,
+                aqi: 52,
+                pm25: 18,
+                pm10: 32,
+                temperature: 23,
+                humidity: 58,
+                status: "moderate",
+                lastUpdate: new Date().toISOString()
+            }
+        ];
+
+        // Historical data for charts
+        let historicalData = {
+            labels: ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"],
+            aqi: [65, 58, 72, 85, 92, 78, 65, 58],
+            pm25: [22, 18, 25, 32, 38, 28, 22, 19],
+            temperature: [20, 19, 21, 24, 26, 25, 23, 21],
+            humidity: [70, 75, 68, 62, 58, 60, 65, 68]
+        };
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Starting Air Quality Dashboard...');
+            initializeMap();
+            initializeCharts();
+            loadSensors();
+            startLiveUpdates();
+        });
+
+        let map;
+        let sensorMarkers = [];
+
+        // Initialize Leaflet Map
+        function initializeMap() {
+            map = L.map('map').setView([40.7589, -73.9851], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            updateMapMarkers();
+        }
+
+        // Update all map markers with current data
+        function updateMapMarkers() {
+            // Clear existing markers
+            sensorMarkers.forEach(marker => map.removeLayer(marker));
+            sensorMarkers = [];
+            
+            // Add updated markers
+            dummySensors.forEach(sensor => {
+                const marker = L.marker([sensor.lat, sensor.lng])
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>${sensor.name}</strong><br>
+                        AQI: ${sensor.aqi} (${sensor.status})<br>
+                        PM2.5: ${sensor.pm25} μg/m³<br>
+                        Temp: ${sensor.temperature}°C
+                    `);
+                
+                const iconColor = getStatusColor(sensor.status);
+                marker.setIcon(
+                    L.divIcon({
+                        className: `custom-marker ${sensor.status}`,
+                        html: `<div style="background-color: ${iconColor}; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${sensor.aqi}</div>`,
+                        iconSize: [35, 35]
+                    })
+                );
+                
+                sensorMarkers.push(marker);
+            });
+        }
+
+        let aqiChart, pollutantChart;
+
+        // Initialize Charts
+        function initializeCharts() {
+            // AQI Trend Chart
+            const aqiCtx = document.getElementById('aqiChart').getContext('2d');
+            aqiChart = new Chart(aqiCtx, {
+                type: 'line',
+                data: {
+                    labels: historicalData.labels,
+                    datasets: [{
+                        label: 'AQI',
+                        data: historicalData.aqi,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    animation: {
+                        duration: 1000
+                    }
+                }
+            });
+
+            // Pollutant Chart
+            const pollutantCtx = document.getElementById('pollutantChart').getContext('2d');
+            pollutantChart = new Chart(pollutantCtx, {
+                type: 'bar',
+                data: {
+                    labels: historicalData.labels,
+                    datasets: [
+                        {
+                            label: 'PM2.5',
+                            data: historicalData.pm25,
+                            backgroundColor: 'rgba(231, 76, 60, 0.8)'
+                        },
+                        {
+                            label: 'Temperature',
+                            data: historicalData.temperature,
+                            backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                            type: 'line',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    animation: {
+                        duration: 1000
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'PM2.5 (μg/m³)'
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load sensor list
+        function loadSensors() {
+            updateSensorGrid();
+        }
+
+        // Update all sensor cards
+        function updateSensorGrid() {
+            const sensorGrid = document.getElementById('sensorGrid');
+            sensorGrid.innerHTML = '';
+
+            dummySensors.forEach(sensor => {
+                const sensorElement = document.createElement('div');
+                sensorElement.className = `sensor-item ${sensor.status}`;
+                sensorElement.innerHTML = `
+                    <div class="sensor-header">
+                        <span class="sensor-name">${sensor.name}</span>
+                        <span class="sensor-aqi">AQI: ${sensor.aqi}</span>
+                    </div>
+                    <div class="sensor-details">
+                        <p>PM2.5: ${sensor.pm25} μg/m³ | PM10: ${sensor.pm10} μg/m³</p>
+                        <p>Temp: ${sensor.temperature}°C | Humidity: ${sensor.humidity}%</p>
+                        <p class="sensor-status">Status: <strong>${sensor.status.toUpperCase()}</strong></p>
+                        <small>Updated: ${new Date().toLocaleTimeString()}</small>
+                    </div>
+                `;
+                sensorGrid.appendChild(sensorElement);
+            });
+        }
+
+        // Update status cards (PM2.5, Temperature, Humidity)
+        function updateStatusCards() {
+            // Get average values from all sensors
+            const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+            const avgTemp = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / dummySensors.length);
+            const avgHumidity = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / dummySensors.length);
+            
+            // Update PM2.5 card
+            document.getElementById('pm25Value').textContent = `${avgPM25} μg/m³`;
+            document.getElementById('pm25Status').textContent = getPM25Status(avgPM25);
+            
+            // Update Temperature card
+            document.getElementById('tempValue').textContent = `${avgTemp}°C`;
+            document.getElementById('tempStatus').textContent = getTempStatus(avgTemp);
+            
+            // Update Humidity card
+            document.getElementById('humidityValue').textContent = `${avgHumidity}%`;
+            document.getElementById('humidityStatus').textContent = getHumidityStatus(avgHumidity);
+        }
+
+        // Update charts with new data
+        function updateCharts() {
+            // Shift historical data and add new values
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            
+            historicalData.labels.push(timeString);
+            if (historicalData.labels.length > 8) historicalData.labels.shift();
+            
+            // Add new AQI value (average of all sensors)
+            const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
+            historicalData.aqi.push(avgAqi);
+            if (historicalData.aqi.length > 8) historicalData.aqi.shift();
+            
+            // Add new PM2.5 value
+            const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+            historicalData.pm25.push(avgPM25);
+            if (historicalData.pm25.length > 8) historicalData.pm25.shift();
+            
+            // Add new temperature (slight variation)
+            const newTemp = historicalData.temperature[historicalData.temperature.length - 1] + (Math.random() * 2 - 1);
+            historicalData.temperature.push(Math.round(newTemp * 10) / 10);
+            if (historicalData.temperature.length > 8) historicalData.temperature.shift();
+            
+            // Update charts
+            aqiChart.update('active');
+            pollutantChart.update('active');
+        }
+
+        // Generate realistic sensor data updates
+        function updateSensorData() {
+            dummySensors.forEach(sensor => {
+                // Simulate realistic changes with more variation
+                sensor.aqi = Math.max(10, Math.min(200, sensor.aqi + Math.floor(Math.random() * 20 - 8)));
+                sensor.pm25 = Math.max(5, Math.min(80, sensor.pm25 + Math.floor(Math.random() * 10 - 4)));
+                sensor.pm10 = Math.max(10, Math.min(120, sensor.pm10 + Math.floor(Math.random() * 15 - 6)));
+                sensor.temperature = Math.max(15, Math.min(35, sensor.temperature + (Math.random() * 3 - 1.5)));
+                sensor.humidity = Math.max(30, Math.min(90, sensor.humidity + Math.floor(Math.random() * 10 - 4)));
+                
+                // Update status based on new AQI
+                sensor.status = getAqiStatus(sensor.aqi);
+                sensor.lastUpdate = new Date().toISOString();
+            });
+        }
+
+        // Main update function - updates EVERYTHING
+        function startLiveUpdates() {
+            console.log('🔄 Starting live updates every 3 seconds...');
+            
+            // Initial update
+            performFullUpdate();
+            
+            // Set up interval for continuous updates
+            setInterval(() => {
+                performFullUpdate();
+            }, 3000);
+        }
+
+        function performFullUpdate() {
+            const updateTime = new Date();
+            console.log('🔄 Updating all data at:', updateTime.toLocaleTimeString());
+            
+            // Update timestamp
+            document.getElementById('lastUpdate').textContent = `Last update: ${updateTime.toLocaleTimeString()}`;
+            
+            // 1. Update sensor data
+            updateSensorData();
+            
+            // 2. Update main AQI card
+            const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
+            const aqiElement = document.getElementById('mainAqi');
+            aqiElement.textContent = avgAqi;
+            aqiElement.className = 'aqi-value ' + getAqiStatus(avgAqi);
+            document.getElementById('mainStatus').textContent = getAqiStatus(avgAqi).charAt(0).toUpperCase() + getAqiStatus(avgAqi).slice(1);
+            
+            // 3. Update all status cards
+            updateStatusCards();
+            
+            // 4. Update sensor grid
+            updateSensorGrid();
+            
+            // 5. Update map markers
+            updateMapMarkers();
+            
+            // 6. Update charts
+            updateCharts();
+            
+            console.log('✅ Update completed!');
+        }
+
+        // Helper functions
+        function getStatusColor(status) {
+            const colors = {
+                good: '#27ae60',
+                moderate: '#f39c12',
+                poor: '#e74c3c'
+            };
+            return colors[status] || '#3498db';
+        }
+
+        function getAqiStatus(aqi) {
+            if (aqi <= 50) return 'good';
+            if (aqi <= 100) return 'moderate';
+            return 'poor';
+        }
+
+        function getPM25Status(pm25) {
+            if (pm25 <= 12) return 'Good';
+            if (pm25 <= 35) return 'Moderate';
+            if (pm25 <= 55) return 'Unhealthy';
+            return 'Hazardous';
+        }
+
+        function getTempStatus(temp) {
+            if (temp >= 22 && temp <= 26) return 'Comfortable';
+            if (temp >= 18 && temp <= 30) return 'Normal';
+            return 'Extreme';
+        }
+
+        function getHumidityStatus(humidity) {
+            if (humidity >= 40 && humidity <= 60) return 'Ideal';
+            if (humidity >= 30 && humidity <= 70) return 'Normal';
+            return 'Extreme';
+        }
+    </script>
 </body>
 </html>
