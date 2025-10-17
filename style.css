@@ -160,4 +160,19 @@ header p {
     .status-cards {
         grid-template-columns: repeat(2, 1fr);
     }
+
 }
+/* Map Marker Styles */
+.custom-marker {
+    background: transparent;
+    border: none;
+}
+
+.custom-marker div {
+    border: 2px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.custom-marker.good div { background-color: #27ae60; }
+.custom-marker.moderate div { background-color: #f39c12; }
+.custom-marker.poor div { background-color: #e74c3c; }
