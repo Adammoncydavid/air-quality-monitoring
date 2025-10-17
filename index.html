@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Monitoring System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🌍 Air Quality Monitoring System</h1>
+        <p>Real-time environmental data tracking</p>
+    </header>
+
+    <div class="container">
+        <!-- Main Dashboard -->
+        <div class="dashboard">
+            <!-- Current Status Cards -->
+            <div class="status-cards">
+                <div class="card">
+                    <h3>Overall AQI</h3>
+                    <div class="aqi-value good">45</div>
+                    <p>Good</p>
+                </div>
+                <div class="card">
+                    <h3>PM2.5</h3>
+                    <div class="value">12 μg/m³</div>
+                    <p>Moderate</p>
+                </div>
+                <div class="card">
+                    <h3>Temperature</h3>
+                    <div class="value">24°C</div>
+                    <p>Comfortable</p>
+                </div>
+                <div class="card">
+                    <h3>Humidity</h3>
+                    <div class="value">65%</div>
+                    <p>Normal</p>
+                </div>
+            </div>
+
+            <!-- Map Section -->
+            <div class="map-section">
+                <h2>Live Sensor Map</h2>
+                <div id="map"></div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-section">
+                <div class="chart-container">
+                    <h3>Air Quality Trends (Last 24 Hours)</h3>
+                    <canvas id="aqiChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Pollutant Levels</h3>
+                    <canvas id="pollutantChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Sensor List -->
+            <div class="sensor-list">
+                <h3>Active Sensors</h3>
+                <div id="sensorGrid" class="sensor-grid">
+                    <!-- Sensors will be loaded here by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="data/dummy-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
