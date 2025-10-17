@@ -21,11 +21,11 @@ function initializeMap() {
 // Update all map markers with current data
 function updateMapMarkers() {
     // Clear existing markers
-    if (window.sensorMarkers) {
-        window.sensorMarkers.forEach(marker => window.map.removeLayer(marker));
+    if (window.currentMarkers) {
+        window.currentMarkers.forEach(marker => window.map.removeLayer(marker));
     }
     
-    window.sensorMarkers = [];
+    window.currentMarkers = [];
     
     // Add updated markers
     dummySensors.forEach(sensor => {
@@ -47,7 +47,7 @@ function updateMapMarkers() {
             })
         );
         
-        window.sensorMarkers.push(marker);
+        window.currentMarkers.push(marker);
     });
 }
 
@@ -131,7 +131,7 @@ function loadSensors() {
     updateSensorGrid();
 }
 
-// Update all sensor cards
+// Update sensor grid with current data
 function updateSensorGrid() {
     const sensorGrid = document.getElementById('sensorGrid');
     sensorGrid.innerHTML = '';
@@ -155,104 +155,113 @@ function updateSensorGrid() {
     });
 }
 
-// Update status cards (PM2.5, Temperature, Humidity)
-function updateStatusCards() {
-    // Get average values from all sensors
-    const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
-    const avgTemp = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / dummySensors.length);
-    const avgHumidity = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / dummySensors.length);
-    
-    // Update PM2.5 card
-    const pm25Card = document.querySelectorAll('.card')[1];
-    pm25Card.querySelector('.value').textContent = `${avgPM25} μg/m³`;
-    pm25Card.querySelector('p').textContent = getPM25Status(avgPM25);
-    
-    // Update Temperature card
-    const tempCard = document.querySelectorAll('.card')[2];
-    tempCard.querySelector('.value').textContent = `${avgTemp}°C`;
-    tempCard.querySelector('p').textContent = getTempStatus(avgTemp);
-    
-    // Update Humidity card
-    const humidityCard = document.querySelectorAll('.card')[3];
-    humidityCard.querySelector('.value').textContent = `${avgHumidity}%`;
-    humidityCard.querySelector('p').textContent = getHumidityStatus(avgHumidity);
-}
-
-// Update charts with new data
-function updateCharts() {
-    // Shift historical data and add new values
-    historicalData.labels.push(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-    historicalData.labels.shift();
-    
-    // Add new AQI value (average of all sensors)
-    const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
-    historicalData.aqi.push(avgAqi);
-    historicalData.aqi.shift();
-    
-    // Add new PM2.5 value
-    const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
-    historicalData.pm25.push(avgPM25);
-    historicalData.pm25.shift();
-    
-    // Add new temperature (slight variation)
-    const newTemp = historicalData.temperature[historicalData.temperature.length - 1] + (Math.random() * 2 - 1);
-    historicalData.temperature.push(Math.round(newTemp * 10) / 10);
-    historicalData.temperature.shift();
-    
-    // Update charts
-    window.aqiChart.update();
-    window.pollutantChart.update();
-}
-
-// Generate realistic sensor data updates
-function updateSensorData() {
+// **MASTER UPDATE FUNCTION - Updates everything**
+function updateAllData() {
+    // Generate realistic random changes
     dummySensors.forEach(sensor => {
-        // Simulate realistic changes
-        sensor.aqi = Math.max(0, sensor.aqi + Math.floor(Math.random() * 10 - 4));
-        sensor.pm25 = Math.max(0, sensor.pm25 + Math.floor(Math.random() * 6 - 2));
-        sensor.pm10 = Math.max(0, sensor.pm10 + Math.floor(Math.random() * 8 - 3));
-        sensor.temperature = Math.max(-10, sensor.temperature + (Math.random() * 2 - 1));
-        sensor.humidity = Math.max(0, Math.min(100, sensor.humidity + Math.floor(Math.random() * 6 - 3)));
+        // Random but realistic fluctuations
+        const pm25Change = Math.floor(Math.random() * 6) - 2; // -2 to +3
+        const tempChange = (Math.random() * 2) - 1; // -1 to +1
+        const humidityChange = Math.floor(Math.random() * 10) - 5; // -5 to +4
+        
+        // Update values with bounds
+        sensor.pm25 = Math.max(0, sensor.pm25 + pm25Change);
+        sensor.temperature = Math.max(-10, Math.min(45, sensor.temperature + tempChange));
+        sensor.humidity = Math.max(10, Math.min(95, sensor.humidity + humidityChange));
+        
+        // Recalculate AQI based on PM2.5 (simplified)
+        sensor.aqi = Math.min(300, Math.max(0, Math.floor(sensor.pm25 * 2 + Math.random() * 20)));
         
         // Update status based on new AQI
         sensor.status = getAqiStatus(sensor.aqi);
+        
+        // Update last update time
         sensor.lastUpdate = new Date().toISOString();
     });
+
+    // Update status cards
+    updateStatusCards();
+    
+    // Update map markers
+    updateMapMarkers();
+    
+    // Update sensor grid
+    updateSensorGrid();
+    
+    // Update charts with new data point
+    updateCharts();
 }
 
-// Main update function - updates EVERYTHING
+// Update the top status cards
+function updateStatusCards() {
+    // Calculate average AQI across all sensors
+    const avgAqi = Math.floor(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
+    
+    // Update main AQI card
+    const aqiCard = document.querySelector('.aqi-value');
+    aqiCard.textContent = avgAqi;
+    aqiCard.className = 'aqi-value ' + getAqiStatus(avgAqi);
+    
+    // Update status text
+    const statusText = aqiCard.nextElementSibling;
+    statusText.textContent = getAqiStatus(avgAqi).charAt(0).toUpperCase() + getAqiStatus(avgAqi).slice(1);
+
+    // Update PM2.5 card (average)
+    const avgPm25 = Math.floor(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+    document.querySelector('.card:nth-child(2) .value').textContent = `${avgPm25} μg/m³`;
+    document.querySelector('.card:nth-child(2) p').textContent = getPm25Status(avgPm25);
+
+    // Update temperature card (average)
+    const avgTemp = (dummySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / dummySensors.length).toFixed(1);
+    document.querySelector('.card:nth-child(3) .value').textContent = `${avgTemp}°C`;
+
+    // Update humidity card (average)
+    const avgHumidity = Math.floor(dummySensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / dummySensors.length);
+    document.querySelector('.card:nth-child(4) .value').textContent = `${avgHumidity}%`;
+}
+
+// Update charts with rolling data
+function updateCharts() {
+    const now = new Date();
+    const timeLabel = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    // Update AQI chart
+    const aqiData = window.aqiChart.data;
+    aqiData.labels.push(timeLabel);
+    aqiData.labels.shift(); // Remove oldest label
+    
+    const newAqi = Math.floor(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
+    aqiData.datasets[0].data.push(newAqi);
+    aqiData.datasets[0].data.shift(); // Remove oldest data point
+    
+    window.aqiChart.update('none');
+    
+    // Update pollutant chart
+    const pollData = window.pollutantChart.data;
+    pollData.labels.push(timeLabel);
+    pollData.labels.shift();
+    
+    const newPm25 = Math.floor(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+    pollData.datasets[0].data.push(newPm25);
+    pollData.datasets[0].data.shift();
+    
+    const newTemp = (dummySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / dummySensors.length).toFixed(1);
+    pollData.datasets[1].data.push(parseFloat(newTemp));
+    pollData.datasets[1].data.shift();
+    
+    window.pollutantChart.update('none');
+}
+
+// Simulate live updates - UPDATED VERSION
 function startLiveUpdates() {
+    // Initial update
+    updateAllData();
+    
+    // Update everything every 3 seconds
     setInterval(() => {
-        console.log('🔄 Updating all data...');
-        
-        // 1. Update sensor data
-        updateSensorData();
-        
-        // 2. Update main AQI card
-        const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
-        const aqiCard = document.querySelector('.aqi-value');
-        aqiCard.textContent = avgAqi;
-        aqiCard.className = 'aqi-value ' + getAqiStatus(avgAqi);
-        
-        // Update status text
-        const statusText = aqiCard.nextElementSibling;
-        statusText.textContent = getAqiStatus(avgAqi).charAt(0).toUpperCase() + getAqiStatus(avgAqi).slice(1);
-        
-        // 3. Update all status cards
-        updateStatusCards();
-        
-        // 4. Update sensor grid
-        updateSensorGrid();
-        
-        // 5. Update map markers
-        updateMapMarkers();
-        
-        // 6. Update charts
-        updateCharts();
-        
-        console.log('✅ All data updated at', new Date().toLocaleTimeString());
-        
-    }, 3000); // Update every 3 seconds for more activity
+        updateAllData();
+        console.log('📊 Full data update completed at', new Date().toLocaleTimeString());
+    }, 3000);
 }
 
 // Helper functions
@@ -271,21 +280,8 @@ function getAqiStatus(aqi) {
     return 'poor';
 }
 
-function getPM25Status(pm25) {
+function getPm25Status(pm25) {
     if (pm25 <= 12) return 'Good';
     if (pm25 <= 35) return 'Moderate';
-    if (pm25 <= 55) return 'Unhealthy';
-    return 'Hazardous';
-}
-
-function getTempStatus(temp) {
-    if (temp >= 22 && temp <= 26) return 'Comfortable';
-    if (temp >= 18 && temp <= 30) return 'Normal';
-    return 'Extreme';
-}
-
-function getHumidityStatus(humidity) {
-    if (humidity >= 40 && humidity <= 60) return 'Ideal';
-    if (humidity >= 30 && humidity <= 70) return 'Normal';
-    return 'Extreme';
+    return 'Poor';
 }
