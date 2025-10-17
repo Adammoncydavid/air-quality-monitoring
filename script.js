@@ -8,18 +8,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize Leaflet Map
 function initializeMap() {
-    // Create map centered on a default location
     const map = L.map('map').setView([40.7589, -73.9851], 12);
 
-    // Add tile layer (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Add sensor markers
+    window.map = map;
+    updateMapMarkers();
+}
+
+// Update all map markers with current data
+function updateMapMarkers() {
+    // Clear existing markers
+    if (window.sensorMarkers) {
+        window.sensorMarkers.forEach(marker => window.map.removeLayer(marker));
+    }
+    
+    window.sensorMarkers = [];
+    
+    // Add updated markers
     dummySensors.forEach(sensor => {
         const marker = L.marker([sensor.lat, sensor.lng])
-            .addTo(map)
+            .addTo(window.map)
             .bindPopup(`
                 <strong>${sensor.name}</strong><br>
                 AQI: ${sensor.aqi} (${sensor.status})<br>
@@ -27,18 +38,17 @@ function initializeMap() {
                 Temp: ${sensor.temperature}°C
             `);
         
-        // Color code markers based on AQI
         const iconColor = getStatusColor(sensor.status);
         marker.setIcon(
             L.divIcon({
                 className: `custom-marker ${sensor.status}`,
-                html: `<div style="background-color: ${iconColor}">${sensor.aqi}</div>`,
+                html: `<div style="background-color: ${iconColor}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${sensor.aqi}</div>`,
                 iconSize: [30, 30]
             })
         );
+        
+        window.sensorMarkers.push(marker);
     });
-
-    window.map = map; // Store map globally
 }
 
 // Initialize Charts
@@ -118,6 +128,11 @@ function initializeCharts() {
 
 // Load sensor list
 function loadSensors() {
+    updateSensorGrid();
+}
+
+// Update all sensor cards
+function updateSensorGrid() {
     const sensorGrid = document.getElementById('sensorGrid');
     sensorGrid.innerHTML = '';
 
@@ -133,29 +148,111 @@ function loadSensors() {
                 <p>PM2.5: ${sensor.pm25} μg/m³ | PM10: ${sensor.pm10} μg/m³</p>
                 <p>Temp: ${sensor.temperature}°C | Humidity: ${sensor.humidity}%</p>
                 <p class="sensor-status">Status: <strong>${sensor.status.toUpperCase()}</strong></p>
+                <small>Updated: ${new Date().toLocaleTimeString()}</small>
             </div>
         `;
         sensorGrid.appendChild(sensorElement);
     });
 }
 
-// Simulate live updates
+// Update status cards (PM2.5, Temperature, Humidity)
+function updateStatusCards() {
+    // Get average values from all sensors
+    const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+    const avgTemp = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / dummySensors.length);
+    const avgHumidity = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / dummySensors.length);
+    
+    // Update PM2.5 card
+    const pm25Card = document.querySelectorAll('.card')[1];
+    pm25Card.querySelector('.value').textContent = `${avgPM25} μg/m³`;
+    pm25Card.querySelector('p').textContent = getPM25Status(avgPM25);
+    
+    // Update Temperature card
+    const tempCard = document.querySelectorAll('.card')[2];
+    tempCard.querySelector('.value').textContent = `${avgTemp}°C`;
+    tempCard.querySelector('p').textContent = getTempStatus(avgTemp);
+    
+    // Update Humidity card
+    const humidityCard = document.querySelectorAll('.card')[3];
+    humidityCard.querySelector('.value').textContent = `${avgHumidity}%`;
+    humidityCard.querySelector('p').textContent = getHumidityStatus(avgHumidity);
+}
+
+// Update charts with new data
+function updateCharts() {
+    // Shift historical data and add new values
+    historicalData.labels.push(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+    historicalData.labels.shift();
+    
+    // Add new AQI value (average of all sensors)
+    const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
+    historicalData.aqi.push(avgAqi);
+    historicalData.aqi.shift();
+    
+    // Add new PM2.5 value
+    const avgPM25 = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / dummySensors.length);
+    historicalData.pm25.push(avgPM25);
+    historicalData.pm25.shift();
+    
+    // Add new temperature (slight variation)
+    const newTemp = historicalData.temperature[historicalData.temperature.length - 1] + (Math.random() * 2 - 1);
+    historicalData.temperature.push(Math.round(newTemp * 10) / 10);
+    historicalData.temperature.shift();
+    
+    // Update charts
+    window.aqiChart.update();
+    window.pollutantChart.update();
+}
+
+// Generate realistic sensor data updates
+function updateSensorData() {
+    dummySensors.forEach(sensor => {
+        // Simulate realistic changes
+        sensor.aqi = Math.max(0, sensor.aqi + Math.floor(Math.random() * 10 - 4));
+        sensor.pm25 = Math.max(0, sensor.pm25 + Math.floor(Math.random() * 6 - 2));
+        sensor.pm10 = Math.max(0, sensor.pm10 + Math.floor(Math.random() * 8 - 3));
+        sensor.temperature = Math.max(-10, sensor.temperature + (Math.random() * 2 - 1));
+        sensor.humidity = Math.max(0, Math.min(100, sensor.humidity + Math.floor(Math.random() * 6 - 3)));
+        
+        // Update status based on new AQI
+        sensor.status = getAqiStatus(sensor.aqi);
+        sensor.lastUpdate = new Date().toISOString();
+    });
+}
+
+// Main update function - updates EVERYTHING
 function startLiveUpdates() {
     setInterval(() => {
-        // Update overall AQI card with random variation
+        console.log('🔄 Updating all data...');
+        
+        // 1. Update sensor data
+        updateSensorData();
+        
+        // 2. Update main AQI card
+        const avgAqi = Math.round(dummySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / dummySensors.length);
         const aqiCard = document.querySelector('.aqi-value');
-        const currentAqi = parseInt(aqiCard.textContent);
-        const newAqi = Math.max(0, currentAqi + Math.floor(Math.random() * 10 - 5));
+        aqiCard.textContent = avgAqi;
+        aqiCard.className = 'aqi-value ' + getAqiStatus(avgAqi);
         
-        aqiCard.textContent = newAqi;
-        aqiCard.className = 'aqi-value ' + getAqiStatus(newAqi);
-        
-        // Update the status text
+        // Update status text
         const statusText = aqiCard.nextElementSibling;
-        statusText.textContent = getAqiStatus(newAqi).charAt(0).toUpperCase() + getAqiStatus(newAqi).slice(1);
-
-        console.log('Live update: AQI now at', newAqi);
-    }, 5000); // Update every 5 seconds
+        statusText.textContent = getAqiStatus(avgAqi).charAt(0).toUpperCase() + getAqiStatus(avgAqi).slice(1);
+        
+        // 3. Update all status cards
+        updateStatusCards();
+        
+        // 4. Update sensor grid
+        updateSensorGrid();
+        
+        // 5. Update map markers
+        updateMapMarkers();
+        
+        // 6. Update charts
+        updateCharts();
+        
+        console.log('✅ All data updated at', new Date().toLocaleTimeString());
+        
+    }, 3000); // Update every 3 seconds for more activity
 }
 
 // Helper functions
@@ -172,4 +269,23 @@ function getAqiStatus(aqi) {
     if (aqi <= 50) return 'good';
     if (aqi <= 100) return 'moderate';
     return 'poor';
+}
+
+function getPM25Status(pm25) {
+    if (pm25 <= 12) return 'Good';
+    if (pm25 <= 35) return 'Moderate';
+    if (pm25 <= 55) return 'Unhealthy';
+    return 'Hazardous';
+}
+
+function getTempStatus(temp) {
+    if (temp >= 22 && temp <= 26) return 'Comfortable';
+    if (temp >= 18 && temp <= 30) return 'Normal';
+    return 'Extreme';
+}
+
+function getHumidityStatus(humidity) {
+    if (humidity >= 40 && humidity <= 60) return 'Ideal';
+    if (humidity >= 30 && humidity <= 70) return 'Normal';
+    return 'Extreme';
 }
