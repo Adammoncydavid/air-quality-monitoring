@@ -44,7 +44,7 @@ header p {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .card {
@@ -75,6 +75,36 @@ header p {
     font-weight: bold;
     color: #2c3e50;
     margin: 0.5rem 0;
+}
+
+/* Data Source Toggle */
+.data-source-toggle {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    justify-content: center;
+}
+
+.source-btn {
+    padding: 0.8rem 1.5rem;
+    border: none;
+    border-radius: 25px;
+    background: #ecf0f1;
+    color: #2c3e50;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.source-btn:hover {
+    background: #bdc3c7;
+    transform: translateY(-2px);
+}
+
+.source-btn.active {
+    background: #3498db;
+    color: white;
 }
 
 /* Map Section */
@@ -133,7 +163,7 @@ header p {
 
 .sensor-header {
     display: flex;
-    justify-content: between;
+    justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
 }
@@ -145,6 +175,40 @@ header p {
 
 .sensor-aqi {
     font-weight: bold;
+}
+
+/* Status Indicators */
+.api-status {
+    background: #27ae60;
+    color: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+}
+
+.api-status.offline {
+    background: #e74c3c;
+}
+
+.api-status.connecting {
+    background: #f39c12;
+}
+
+.update-indicator {
+    background: #e74c3c;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    margin-left: 10px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }
 
 /* Responsive Design */
@@ -160,19 +224,13 @@ header p {
     .status-cards {
         grid-template-columns: repeat(2, 1fr);
     }
-
+    
+    .data-source-toggle {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .source-btn {
+        width: 200px;
+    }
 }
-/* Map Marker Styles */
-.custom-marker {
-    background: transparent;
-    border: none;
-}
-
-.custom-marker div {
-    border: 2px solid white;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
-
-.custom-marker.good div { background-color: #27ae60; }
-.custom-marker.moderate div { background-color: #f39c12; }
-.custom-marker.poor div { background-color: #e74c3c; }
