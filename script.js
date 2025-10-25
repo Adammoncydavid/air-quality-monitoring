@@ -27,6 +27,13 @@ let mqttSensor = null;
 let mqttClient = null;
 let map;
 let sensorMarkers = [];
+let isMQTTConnected = false;
+let mqttHistory = {
+    temperature: [],
+    humidity: [],
+    gas: [],
+    timestamps: []
+};
 
 const historicalData = {
     labels: [],
@@ -85,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeMap() {
     const defaultLat = 9.21167230280324;
     const defaultLng = 76.64228335554053;
-    const defaultZoom = 17; // More zoomed in for campus view
+    const defaultZoom = 17;
 
     map = L.map('map').setView([defaultLat, defaultLng], defaultZoom);
 
@@ -138,6 +145,204 @@ function updateMapMarkers() {
         
         sensorMarkers.push(marker);
     });
+}
+
+// ===============================
+// MQTT FUNCTIONS
+// ===============================
+
+function setupMQTT() {
+    try {
+        console.log('🔌 Connecting to MQTT broker...');
+        updateMQTTStatus('CONNECTING');
+        
+        mqttClient = new Paho.MQTT.Client(
+            MQTT_CONFIG.host,
+            Number(MQTT_CONFIG.port),
+            MQTT_CONFIG.clientId
+        );
+
+        mqttClient.onConnectionLost = onConnectionLost;
+        mqttClient.onMessageArrived = onMessageArrived;
+
+        const connectOptions = {
+            useSSL: true,
+            userName: MQTT_CONFIG.username,
+            password: MQTT_CONFIG.password,
+            onSuccess: onMQTTConnect,
+            onFailure: onMQTTConnectionFailure,
+            timeout: 3,
+            keepAliveInterval: 60,
+            cleanSession: true
+        };
+
+        mqttClient.connect(connectOptions);
+        
+    } catch (error) {
+        console.error('MQTT setup error:', error);
+        updateMQTTStatus('ERROR');
+    }
+}
+
+function onMQTTConnect() {
+    console.log('✅ Connected to MQTT broker');
+    isMQTTConnected = true;
+    updateMQTTStatus('CONNECTED');
+    updateMQTTToggleButton();
+    mqttClient.subscribe(MQTT_CONFIG.topic);
+    console.log('📡 Subscribed to topic: ' + MQTT_CONFIG.topic);
+}
+
+function onMQTTConnectionFailure(error) {
+    console.error('❌ MQTT connection failed:', error);
+    isMQTTConnected = false;
+    updateMQTTStatus('OFFLINE');
+    updateMQTTToggleButton();
+}
+
+function onConnectionLost(responseObject) {
+    if (responseObject.errorCode !== 0) {
+        console.error('🔌 Connection lost:', responseObject.errorMessage);
+        isMQTTConnected = false;
+        updateMQTTStatus('OFFLINE');
+        updateMQTTToggleButton();
+    }
+}
+
+function onMessageArrived(message) {
+    try {
+        console.log('📨 MQTT Message received:', message.payloadString);
+        displayRawData(message.payloadString);
+        
+        const data = JSON.parse(message.payloadString);
+        processMQTTData(data);
+        
+    } catch (error) {
+        console.error('❌ Error processing MQTT message:', error);
+        displayRawData('Error parsing: ' + message.payloadString);
+    }
+}
+
+function processMQTTData(data) {
+    // Extract values with fallbacks for different field names
+    const temperature = data.temperature || data.temp || 0;
+    const humidity = data.humidity || data.hum || 0;
+    const gas = data.gas || data.gasLevel || 0;
+    
+    // Create sensor object from MQTT data
+    mqttSensor = {
+        id: 'esp32-live',
+        name: 'ESP32 Live Sensor 🔥',
+        lat: data.latitude || 9.211889407438802,
+        lng: data.longitude || 76.642251169034,
+        aqi: calculateAQIFromGas(gas),
+        pm25: data.pm25 || 0,
+        pm10: data.pm10 || 0,
+        temperature: temperature,
+        humidity: humidity,
+        gas: gas,
+        status: getAqiStatus(calculateAQIFromGas(gas)),
+        lastUpdate: new Date().toISOString(),
+        isRealTime: true
+    };
+    
+    // Update MQTT history
+    updateMqttHistory(mqttSensor);
+    
+    console.log('📊 Processed MQTT data:', mqttSensor);
+    
+    // Update gauges
+    updateMQTTGauges(mqttSensor);
+    
+    // If currently viewing MQTT data, update dashboard
+    if (currentDataSource === 'mqtt') {
+        updateDashboard();
+    }
+    
+    updateMQTTStatus('LIVE DATA');
+}
+
+function updateMqttHistory(sensor) {
+    const timestamp = new Date().toLocaleTimeString();
+    
+    mqttHistory.temperature.push(sensor.temperature);
+    mqttHistory.humidity.push(sensor.humidity);
+    mqttHistory.gas.push(sensor.gas);
+    mqttHistory.timestamps.push(timestamp);
+    
+    // Keep only last 20 readings
+    if (mqttHistory.temperature.length > 20) {
+        mqttHistory.temperature.shift();
+        mqttHistory.humidity.shift();
+        mqttHistory.gas.shift();
+        mqttHistory.timestamps.shift();
+    }
+}
+
+function updateMQTTGauges(sensor) {
+    // Update temperature gauge (0-50°C range)
+    updateGauge('tempGauge', sensor.temperature, 0, 50, '°C');
+    updateGaugeDetail('tempGaugeDetail', sensor.temperature, '°C', getTempStatus(sensor.temperature));
+    
+    // Update humidity gauge (0-100% range)
+    updateGauge('humidityGauge', sensor.humidity, 0, 100, '%');
+    updateGaugeDetail('humidityGaugeDetail', sensor.humidity, '%', getHumidityStatus(sensor.humidity));
+    
+    // Update gas gauge (0-1000 ppm range)
+    updateGauge('gasGauge', sensor.gas, 0, 1000, 'ppm');
+    updateGaugeDetail('gasDetail', sensor.gas, 'ppm', getGasStatus(sensor.gas));
+}
+
+function updateGauge(gaugeId, value, min, max, unit) {
+    const gauge = document.getElementById(gaugeId);
+    if (gauge && value !== null) {
+        const fill = gauge.querySelector('.gauge-fill');
+        const valueSpan = gauge.querySelector('.gauge-value');
+        
+        const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+        fill.style.width = `${percentage}%`;
+        valueSpan.textContent = `${value.toFixed(1)} ${unit}`;
+    }
+}
+
+function updateGaugeDetail(elementId, value, unit, status) {
+    const element = document.getElementById(elementId);
+    if (element && value !== null) {
+        element.textContent = `${value.toFixed(1)}${unit} (${status})`;
+    }
+}
+
+function toggleMQTT() {
+    const toggleBtn = document.getElementById('mqttToggle');
+    
+    if (isMQTTConnected) {
+        // Disconnect
+        if (mqttClient) {
+            mqttClient.disconnect();
+        }
+        isMQTTConnected = false;
+        toggleBtn.textContent = '🟢 Start MQTT';
+        toggleBtn.className = 'mqtt-toggle disconnected';
+        updateMQTTStatus('STOPPED');
+    } else {
+        // Reconnect
+        setupMQTT();
+        toggleBtn.textContent = '🔴 Stop MQTT';
+        toggleBtn.className = 'mqtt-toggle connected';
+    }
+}
+
+function updateMQTTToggleButton() {
+    const toggleBtn = document.getElementById('mqttToggle');
+    if (toggleBtn) {
+        if (isMQTTConnected) {
+            toggleBtn.textContent = '🔴 Stop MQTT';
+            toggleBtn.className = 'mqtt-toggle connected';
+        } else {
+            toggleBtn.textContent = '🟢 Start MQTT';
+            toggleBtn.className = 'mqtt-toggle disconnected';
+        }
+    }
 }
 
 // ===============================
@@ -231,14 +436,22 @@ function updateChartsWithData() {
     let currentData = null;
     switch(currentDataSource) {
         case 'mqtt':
-            currentData = mqttSensor;
+            if (mqttSensor) {
+                currentData = {
+                    aqi: mqttSensor.aqi,
+                    pm25: mqttSensor.pm25,
+                    temperature: mqttSensor.temperature,
+                    humidity: mqttSensor.humidity
+                };
+            }
             break;
         case 'api':
             if (realSensors.length > 0) {
                 currentData = {
                     aqi: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / realSensors.length),
                     pm25: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / realSensors.length),
-                    temperature: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / realSensors.length)
+                    temperature: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / realSensors.length),
+                    humidity: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / realSensors.length)
                 };
             }
             break;
@@ -247,7 +460,8 @@ function updateChartsWithData() {
                 currentData = {
                     aqi: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.aqi, 0) / FALLBACK_SENSORS.length),
                     pm25: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.pm25, 0) / FALLBACK_SENSORS.length),
-                    temperature: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.temperature, 0) / FALLBACK_SENSORS.length)
+                    temperature: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.temperature, 0) / FALLBACK_SENSORS.length),
+                    humidity: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.humidity, 0) / FALLBACK_SENSORS.length)
                 };
             }
             break;
@@ -265,6 +479,10 @@ function updateChartsWithData() {
         // Update temperature data
         historicalData.temperature.push(currentData.temperature);
         if (historicalData.temperature.length > 12) historicalData.temperature.shift();
+        
+        // Update humidity data
+        historicalData.humidity.push(currentData.humidity);
+        if (historicalData.humidity.length > 12) historicalData.humidity.shift();
     }
     
     // Update charts
@@ -280,103 +498,6 @@ function updateChartsWithData() {
         window.pollutantChart.data.datasets[1].data = historicalData.temperature;
         window.pollutantChart.update('none');
     }
-}
-
-// ===============================
-// MQTT FUNCTIONS
-// ===============================
-
-function setupMQTT() {
-    try {
-        console.log('🔌 Connecting to MQTT broker...');
-        updateMQTTStatus('CONNECTING');
-        
-        mqttClient = new Paho.MQTT.Client(
-            MQTT_CONFIG.host,
-            Number(MQTT_CONFIG.port),
-            MQTT_CONFIG.clientId
-        );
-
-        mqttClient.onConnectionLost = onConnectionLost;
-        mqttClient.onMessageArrived = onMessageArrived;
-
-        const connectOptions = {
-            useSSL: true,
-            userName: MQTT_CONFIG.username,
-            password: MQTT_CONFIG.password,
-            onSuccess: onMQTTConnect,
-            onFailure: onMQTTConnectionFailure,
-            timeout: 3,
-            keepAliveInterval: 60,
-            cleanSession: true
-        };
-
-        mqttClient.connect(connectOptions);
-        
-    } catch (error) {
-        console.error('MQTT setup error:', error);
-        updateMQTTStatus('ERROR');
-    }
-}
-
-function onMQTTConnect() {
-    console.log('✅ Connected to MQTT broker');
-    updateMQTTStatus('CONNECTED');
-    mqttClient.subscribe(MQTT_CONFIG.topic);
-    console.log('📡 Subscribed to topic: ' + MQTT_CONFIG.topic);
-}
-
-function onMQTTConnectionFailure(error) {
-    console.error('❌ MQTT connection failed:', error);
-    updateMQTTStatus('OFFLINE');
-}
-
-function onConnectionLost(responseObject) {
-    if (responseObject.errorCode !== 0) {
-        console.error('🔌 Connection lost:', responseObject.errorMessage);
-        updateMQTTStatus('OFFLINE');
-    }
-}
-
-function onMessageArrived(message) {
-    try {
-        console.log('📨 MQTT Message received:', message.payloadString);
-        
-        const data = JSON.parse(message.payloadString);
-        
-        // Process MQTT data
-        processMQTTData(data);
-        
-    } catch (error) {
-        console.error('❌ Error processing MQTT message:', error);
-    }
-}
-
-function processMQTTData(data) {
-    // Create sensor object from MQTT data
-    mqttSensor = {
-        id: 'esp32-live',
-        name: 'ESP32 Live Sensor 🔥',
-        lat: data.latitude || 9.211889407438802,
-        lng: data.longitude || 76.642251169034,
-        aqi: calculateAQI(data.pm25),
-        pm25: data.pm25,
-        pm10: data.pm10 || 0,
-        temperature: data.temperature,
-        humidity: data.humidity,
-        status: getAqiStatus(calculateAQI(data.pm25)),
-        lastUpdate: new Date().toISOString(),
-        isRealTime: true
-    };
-    
-    console.log('📊 Processed MQTT data:', mqttSensor);
-    
-    // If currently viewing MQTT data, update dashboard
-    if (currentDataSource === 'mqtt') {
-        updateDashboard();
-    }
-    
-    updateMQTTStatus('LIVE DATA');
 }
 
 // ===============================
@@ -498,14 +619,18 @@ function updateDashboard() {
         case 'mqtt':
             displaySensors = mqttSensor ? [mqttSensor] : [];
             dataSource = 'LIVE SENSOR';
+            // Show/hide real-time section
+            document.getElementById('realtimeSection').style.display = mqttSensor ? 'block' : 'none';
             break;
         case 'api':
             displaySensors = realSensors;
             dataSource = 'API DATA';
+            document.getElementById('realtimeSection').style.display = 'none';
             break;
         case 'demo':
             displaySensors = FALLBACK_SENSORS;
             dataSource = 'DEMO DATA';
+            document.getElementById('realtimeSection').style.display = 'none';
             break;
     }
     
@@ -561,6 +686,7 @@ function updateSensorGrid(sensors) {
             <div class="sensor-details">
                 <p>PM2.5: ${sensor.pm25} μg/m³ | PM10: ${sensor.pm10} μg/m³</p>
                 <p>Temp: ${sensor.temperature}°C | Humidity: ${sensor.humidity}%</p>
+                ${sensor.gas ? `<p>Gas: ${sensor.gas} ppm</p>` : ''}
                 <p class="sensor-status">Status: <strong>${sensor.status.toUpperCase()}</strong> | ${dataSource}</p>
                 <small>Updated: ${new Date(sensor.lastUpdate).toLocaleTimeString()}</small>
             </div>
@@ -618,12 +744,29 @@ function updateMQTTStatus(status) {
     }
 }
 
+function displayRawData(data) {
+    const rawDataElement = document.getElementById('rawData');
+    if (rawDataElement) {
+        rawDataElement.textContent = data;
+        // Auto-scroll to bottom
+        rawDataElement.scrollTop = rawDataElement.scrollHeight;
+    }
+}
+
 function calculateAQI(pm25) {
     if (pm25 <= 12) return Math.floor((pm25 / 12) * 50);
     if (pm25 <= 35.4) return Math.floor(50 + ((pm25 - 12.1) / (35.4 - 12.1)) * 50);
     if (pm25 <= 55.4) return Math.floor(100 + ((pm25 - 35.5) / (55.4 - 35.5)) * 50);
     if (pm25 <= 150.4) return Math.floor(150 + ((pm25 - 55.5) / (150.4 - 55.5)) * 50);
     return 200 + Math.floor((pm25 - 150.5) / 2);
+}
+
+function calculateAQIFromGas(gas) {
+    // Simple conversion from gas ppm to AQI
+    if (gas <= 50) return Math.floor((gas / 50) * 50);
+    if (gas <= 100) return Math.floor(50 + ((gas - 50) / 50) * 50);
+    if (gas <= 200) return Math.floor(100 + ((gas - 100) / 100) * 50);
+    return 150 + Math.floor((gas - 200) / 10);
 }
 
 function getAqiStatus(aqi) {
@@ -658,6 +801,13 @@ function getHumidityStatus(humidity) {
     if (humidity >= 65 && humidity <= 75) return 'Ideal';
     if (humidity >= 60 && humidity <= 80) return 'Normal';
     return 'Extreme';
+}
+
+function getGasStatus(gas) {
+    if (gas <= 100) return 'Good';
+    if (gas <= 300) return 'Moderate';
+    if (gas <= 500) return 'Poor';
+    return 'Hazardous';
 }
 
 // Manual refresh function

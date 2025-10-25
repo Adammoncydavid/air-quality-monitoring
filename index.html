@@ -16,6 +16,10 @@
            <span id="apiStatus" class="api-status">API: ONLINE</span>
            <span id="mqttStatus" class="api-status">MQTT: CONNECTING</span>
         </p>
+        <div class="connection-controls">
+            <button onclick="refreshData()" class="refresh-btn">🔄 Refresh Data</button>
+            <button onclick="toggleMQTT()" class="mqtt-toggle" id="mqttToggle">🔴 Stop MQTT</button>
+        </div>
     </header>
 
     <div class="container">
@@ -51,6 +55,43 @@
                 <button class="source-btn" onclick="switchDataSource('demo')">📱 Demo Data</button>
             </div>
 
+            <!-- Real-time Sensor Data Section -->
+            <div class="realtime-section" id="realtimeSection" style="display: none;">
+                <h2>📊 Live ESP32 Sensor Readings <span class="update-indicator">LIVE</span></h2>
+                <div class="sensor-readings">
+                    <div class="reading-card">
+                        <h4>Gas Level</h4>
+                        <div class="gauge" id="gasGauge">
+                            <div class="gauge-fill" style="width: 0%"></div>
+                            <span class="gauge-value">-- ppm</span>
+                        </div>
+                        <div class="reading-details">
+                            <span>Status: </span><span id="gasDetail">No data</span>
+                        </div>
+                    </div>
+                    <div class="reading-card">
+                        <h4>Temperature</h4>
+                        <div class="gauge" id="tempGauge">
+                            <div class="gauge-fill" style="width: 0%"></div>
+                            <span class="gauge-value">-- °C</span>
+                        </div>
+                        <div class="reading-details">
+                            <span>Status: </span><span id="tempGaugeDetail">No data</span>
+                        </div>
+                    </div>
+                    <div class="reading-card">
+                        <h4>Humidity</h4>
+                        <div class="gauge" id="humidityGauge">
+                            <div class="gauge-fill" style="width: 0%"></div>
+                            <span class="gauge-value">-- %</span>
+                        </div>
+                        <div class="reading-details">
+                            <span>Status: </span><span id="humidityGaugeDetail">No data</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Map Section -->
             <div class="map-section">
                 <h2>Live Sensor Map <span class="update-indicator">LIVE</span></h2>
@@ -66,6 +107,14 @@
                 <div class="chart-container">
                     <h3>Pollutant Levels</h3>
                     <canvas id="pollutantChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Raw MQTT Data -->
+            <div class="raw-data-section">
+                <h3>📡 Raw MQTT Data <small>(Debug View)</small></h3>
+                <div class="raw-data-container">
+                    <pre id="rawData">Waiting for data from ESP32...</pre>
                 </div>
             </div>
 
