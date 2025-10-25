@@ -2,11 +2,6 @@
 // CONFIGURATION
 // ===============================
 
-// API Configuration
-const API_KEY = '147cf1a1470c2ce162064997dfa53119f42e2adb';
-const CITIES = ['london', 'paris', 'delhi', 'beijing'];
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
-
 // MQTT Configuration
 const MQTT_CONFIG = {
     host: '43f5b67fd4334d4eaa22dcfd749351ff.s1.eu.hivemq.cloud',
@@ -21,13 +16,50 @@ const MQTT_CONFIG = {
 // GLOBAL VARIABLES
 // ===============================
 
-let currentDataSource = 'api'; // 'api', 'mqtt', 'demo'
-let realSensors = [];
+let currentDataSource = 'demo'; // 'mqtt', 'demo'
 let mqttSensor = null;
 let mqttClient = null;
 let map;
 let sensorMarkers = [];
 let isMQTTConnected = false;
+let currentLocation = 'library'; // 'library' or 'canteen'
+
+// Location coordinates
+const LOCATIONS = {
+    library: {
+        name: "Library",
+        lat: 9.211889407438802,
+        lng: 76.642251169034,
+        icon: "📚"
+    },
+    canteen: {
+        name: "Canteen", 
+        lat: 9.211624645670256,
+        lng: 76.64222434694523,
+        icon: "🍽️"
+    }
+};
+
+// Demo data for both locations
+const DEMO_DATA = {
+    library: {
+        aqi: 45,
+        pm25: 12,
+        temperature: 28,
+        humidity: 75,
+        gas: 45,
+        status: "good"
+    },
+    canteen: {
+        aqi: 68,
+        pm25: 25,
+        temperature: 29,
+        humidity: 72,
+        gas: 120,
+        status: "moderate"
+    }
+};
+
 let mqttHistory = {
     temperature: [],
     humidity: [],
@@ -43,46 +75,17 @@ const historicalData = {
     humidity: []
 };
 
-// Fallback dummy data
-const FALLBACK_SENSORS = [
-    {
-        id: 1,
-        name: "Main Campus Building",
-        lat: 9.211889407438802,
-        lng: 76.642251169034,
-        aqi: 45,
-        pm25: 12,
-        pm10: 15,
-        temperature: 28,
-        humidity: 75,
-        status: "good",
-        lastUpdate: new Date().toISOString()
-    },
-    {
-        id: 2,
-        name: "Engineering Block", 
-        lat: 9.211624645670256,
-        lng: 76.64222434694523,
-        aqi: 68,
-        pm25: 25,
-        pm10: 45,
-        temperature: 29,
-        humidity: 72,
-        status: "moderate",
-        lastUpdate: new Date().toISOString()
-    }
-];
-
 // ===============================
 // INITIALIZATION
 // ===============================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Starting Hybrid Air Quality Dashboard...');
+    console.log('🚀 Starting Campus Air Quality Dashboard...');
     initializeMap();
     initializeCharts();
     setupMQTT();
     startRealTimeUpdates();
+    updateLocationComparison();
 });
 
 // ===============================
@@ -100,46 +103,21 @@ function initializeMap() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    updateMapMarkers();
-}
-
-function updateMapMarkers() {
-    // Clear existing markers
-    sensorMarkers.forEach(marker => map.removeLayer(marker));
-    sensorMarkers = [];
-    
-    let sensorsToDisplay = [];
-    
-    switch(currentDataSource) {
-        case 'mqtt':
-            if (mqttSensor) sensorsToDisplay = [mqttSensor];
-            break;
-        case 'api':
-            sensorsToDisplay = realSensors;
-            break;
-        case 'demo':
-            sensorsToDisplay = FALLBACK_SENSORS;
-            break;
-    }
-    
-    // Add markers for each sensor
-    sensorsToDisplay.forEach(sensor => {
-        const marker = L.marker([sensor.lat, sensor.lng])
+    // Add markers for both locations
+    Object.keys(LOCATIONS).forEach(locationKey => {
+        const location = LOCATIONS[locationKey];
+        const marker = L.marker([location.lat, location.lng])
             .addTo(map)
             .bindPopup(`
-                <strong>${sensor.name}</strong><br>
-                AQI: ${sensor.aqi} (${sensor.status})<br>
-                PM2.5: ${sensor.pm25} μg/m³<br>
-                ${sensor.temperature ? `Temp: ${sensor.temperature}°C<br>` : ''}
-                ${sensor.humidity ? `Humidity: ${sensor.humidity}%` : ''}
+                <strong>${location.icon} ${location.name}</strong><br>
+                <em>Air Quality Monitoring Station</em>
             `);
         
-        const iconColor = getStatusColor(sensor.status);
         marker.setIcon(
             L.divIcon({
-                className: `custom-marker ${sensor.status}`,
-                html: `<div style="background-color: ${iconColor}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${sensor.aqi}</div>`,
-                iconSize: [30, 30]
+                className: 'location-marker',
+                html: `<div style="background-color: #3498db; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 16px;">${location.icon}</div>`,
+                iconSize: [40, 40]
             })
         );
         
@@ -229,30 +207,36 @@ function processMQTTData(data) {
     const humidity = data.humidity || data.hum || 0;
     const gas = data.gas || data.gasLevel || 0;
     
+    // Determine location based on sensor data or alternate between locations
+    currentLocation = data.location || (currentLocation === 'library' ? 'canteen' : 'library');
+    
     // Create sensor object from MQTT data
     mqttSensor = {
         id: 'esp32-live',
-        name: 'ESP32 Live Sensor 🔥',
-        lat: data.latitude || 9.211889407438802,
-        lng: data.longitude || 76.642251169034,
+        name: `${LOCATIONS[currentLocation].icon} ${LOCATIONS[currentLocation].name} - Live`,
+        lat: LOCATIONS[currentLocation].lat,
+        lng: LOCATIONS[currentLocation].lng,
         aqi: calculateAQIFromGas(gas),
         pm25: data.pm25 || 0,
-        pm10: data.pm10 || 0,
         temperature: temperature,
         humidity: humidity,
         gas: gas,
         status: getAqiStatus(calculateAQIFromGas(gas)),
         lastUpdate: new Date().toISOString(),
-        isRealTime: true
+        isRealTime: true,
+        location: currentLocation
     };
     
     // Update MQTT history
     updateMqttHistory(mqttSensor);
     
-    console.log('📊 Processed MQTT data:', mqttSensor);
+    console.log('📊 Processed MQTT data for:', currentLocation, mqttSensor);
     
     // Update gauges
     updateMQTTGauges(mqttSensor);
+    
+    // Update location comparison
+    updateLocationComparison();
     
     // If currently viewing MQTT data, update dashboard
     if (currentDataSource === 'mqtt') {
@@ -356,14 +340,24 @@ function initializeCharts() {
         type: 'line',
         data: {
             labels: historicalData.labels,
-            datasets: [{
-                label: 'AQI',
-                data: historicalData.aqi,
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
+            datasets: [
+                {
+                    label: 'Library AQI',
+                    data: [],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Canteen AQI',
+                    data: [],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
         },
         options: {
             responsive: true,
@@ -371,24 +365,25 @@ function initializeCharts() {
         }
     });
 
-    // Pollutant Chart
-    const pollutantCtx = document.getElementById('pollutantChart').getContext('2d');
-    window.pollutantChart = new Chart(pollutantCtx, {
+    // Environment Chart
+    const envCtx = document.getElementById('environmentChart').getContext('2d');
+    window.environmentChart = new Chart(envCtx, {
         type: 'line',
         data: {
             labels: historicalData.labels,
             datasets: [
                 {
-                    label: 'PM2.5',
-                    data: historicalData.pm25,
+                    label: 'Temperature (°C)',
+                    data: historicalData.temperature,
                     borderColor: 'rgba(231, 76, 60, 0.8)',
                     backgroundColor: 'rgba(231, 76, 60, 0.1)',
                     tension: 0.4,
-                    fill: true
+                    fill: true,
+                    yAxisID: 'y'
                 },
                 {
-                    label: 'Temperature',
-                    data: historicalData.temperature,
+                    label: 'Humidity (%)',
+                    data: historicalData.humidity,
                     borderColor: 'rgba(52, 152, 219, 0.8)',
                     backgroundColor: 'rgba(52, 152, 219, 0.1)',
                     tension: 0.4,
@@ -405,15 +400,16 @@ function initializeCharts() {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'PM2.5 (μg/m³)'
+                        text: 'Temperature (°C)'
                     }
                 },
                 y1: {
                     position: 'right',
                     beginAtZero: true,
+                    max: 100,
                     title: {
                         display: true,
-                        text: 'Temperature (°C)'
+                        text: 'Humidity (%)'
                     },
                     grid: {
                         drawOnChartArea: false
@@ -439,31 +435,18 @@ function updateChartsWithData() {
             if (mqttSensor) {
                 currentData = {
                     aqi: mqttSensor.aqi,
-                    pm25: mqttSensor.pm25,
                     temperature: mqttSensor.temperature,
                     humidity: mqttSensor.humidity
                 };
             }
             break;
-        case 'api':
-            if (realSensors.length > 0) {
-                currentData = {
-                    aqi: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / realSensors.length),
-                    pm25: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / realSensors.length),
-                    temperature: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / realSensors.length),
-                    humidity: Math.round(realSensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / realSensors.length)
-                };
-            }
-            break;
         case 'demo':
-            if (FALLBACK_SENSORS.length > 0) {
-                currentData = {
-                    aqi: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.aqi, 0) / FALLBACK_SENSORS.length),
-                    pm25: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.pm25, 0) / FALLBACK_SENSORS.length),
-                    temperature: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.temperature, 0) / FALLBACK_SENSORS.length),
-                    humidity: Math.round(FALLBACK_SENSORS.reduce((sum, sensor) => sum + sensor.humidity, 0) / FALLBACK_SENSORS.length)
-                };
-            }
+            // Use average of both locations for demo data
+            currentData = {
+                aqi: Math.round((DEMO_DATA.library.aqi + DEMO_DATA.canteen.aqi) / 2),
+                temperature: Math.round((DEMO_DATA.library.temperature + DEMO_DATA.canteen.temperature) / 2),
+                humidity: Math.round((DEMO_DATA.library.humidity + DEMO_DATA.canteen.humidity) / 2)
+            };
             break;
     }
     
@@ -471,10 +454,6 @@ function updateChartsWithData() {
         // Update AQI data
         historicalData.aqi.push(currentData.aqi);
         if (historicalData.aqi.length > 12) historicalData.aqi.shift();
-        
-        // Update PM2.5 data
-        historicalData.pm25.push(currentData.pm25);
-        if (historicalData.pm25.length > 12) historicalData.pm25.shift();
         
         // Update temperature data
         historicalData.temperature.push(currentData.temperature);
@@ -488,120 +467,64 @@ function updateChartsWithData() {
     // Update charts
     if (window.aqiChart) {
         window.aqiChart.data.labels = historicalData.labels;
-        window.aqiChart.data.datasets[0].data = historicalData.aqi;
+        // For demo, show both locations
+        if (currentDataSource === 'demo') {
+            window.aqiChart.data.datasets[0].data = Array(historicalData.labels.length).fill(DEMO_DATA.library.aqi);
+            window.aqiChart.data.datasets[1].data = Array(historicalData.labels.length).fill(DEMO_DATA.canteen.aqi);
+        } else {
+            window.aqiChart.data.datasets[0].data = historicalData.aqi;
+            window.aqiChart.data.datasets[1].data = historicalData.aqi;
+        }
         window.aqiChart.update('none');
     }
     
-    if (window.pollutantChart) {
-        window.pollutantChart.data.labels = historicalData.labels;
-        window.pollutantChart.data.datasets[0].data = historicalData.pm25;
-        window.pollutantChart.data.datasets[1].data = historicalData.temperature;
-        window.pollutantChart.update('none');
+    if (window.environmentChart) {
+        window.environmentChart.data.labels = historicalData.labels;
+        window.environmentChart.data.datasets[0].data = historicalData.temperature;
+        window.environmentChart.data.datasets[1].data = historicalData.humidity;
+        window.environmentChart.update('none');
     }
 }
 
 // ===============================
-// API FUNCTIONS
+// LOCATION COMPARISON FUNCTIONS
 // ===============================
 
-async function fetchAirQualityData(city) {
-    const apiUrl = `https://api.waqi.info/feed/${city}/?token=${API_KEY}`;
-    const url = CORS_PROXY + encodeURIComponent(apiUrl);
+function updateLocationComparison() {
+    let libraryData, canteenData;
     
-    try {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-            }
-        });
-        
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (data.status === 'ok') {
-            return data.data;
+    if (currentDataSource === 'mqtt' && mqttSensor) {
+        // For MQTT data, show current sensor reading in one location and demo in the other
+        if (mqttSensor.location === 'library') {
+            libraryData = mqttSensor;
+            canteenData = DEMO_DATA.canteen;
         } else {
-            throw new Error(data.data || 'API returned error');
+            libraryData = DEMO_DATA.library;
+            canteenData = mqttSensor;
         }
-    } catch (error) {
-        console.error(`❌ Error fetching data for ${city}:`, error);
-        return null;
+    } else {
+        // For demo data, use predefined values
+        libraryData = DEMO_DATA.library;
+        canteenData = DEMO_DATA.canteen;
     }
-}
-
-function processAPIData(city, apiData) {
-    if (!apiData) return null;
     
-    const baseLat = 9.211889407438802;
-    const baseLng = 76.642251169034;
-    const lat = baseLat + (Math.random() * 0.002 - 0.001);
-    const lng = baseLng + (Math.random() * 0.002 - 0.001);
+    // Update Library card
+    document.getElementById('libraryAqi').textContent = libraryData.aqi;
+    document.getElementById('libraryAqi').className = getAqiStatus(libraryData.aqi);
+    document.getElementById('libraryTemp').textContent = libraryData.temperature + '°C';
+    document.getElementById('libraryHumidity').textContent = libraryData.humidity + '%';
+    document.getElementById('libraryGas').textContent = libraryData.gas + ' ppm';
     
-    const sensorData = {
-        id: city,
-        name: `${city.charAt(0).toUpperCase() + city.slice(1)} Station`,
-        lat: lat,
-        lng: lng,
-        aqi: apiData.aqi || 0,
-        pm25: apiData.iaqi?.pm25?.v || 0,
-        pm10: apiData.iaqi?.pm10?.v || 0,
-        temperature: apiData.iaqi?.t?.v || Math.round(25 + Math.random() * 10),
-        humidity: apiData.iaqi?.h?.v || Math.round(60 + Math.random() * 20),
-        status: getAqiStatus(apiData.aqi || 0),
-        lastUpdate: new Date().toISOString(),
-        isRealData: true
-    };
+    // Update Canteen card
+    document.getElementById('canteenAqi').textContent = canteenData.aqi;
+    document.getElementById('canteenAqi').className = getAqiStatus(canteenData.aqi);
+    document.getElementById('canteenTemp').textContent = canteenData.temperature + '°C';
+    document.getElementById('canteenHumidity').textContent = canteenData.humidity + '%';
+    document.getElementById('canteenGas').textContent = canteenData.gas + ' ppm';
     
-    return sensorData;
-}
-
-async function updateAllFromAPI() {
-    const apiStatus = document.getElementById('apiStatus');
-    
-    try {
-        apiStatus.textContent = 'API: FETCHING...';
-        apiStatus.className = 'api-status connecting';
-        
-        const fetchPromises = CITIES.map(city => 
-            Promise.race([
-                fetchAirQualityData(city),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 8000)
-                )
-            ])
-        );
-        
-        const results = await Promise.allSettled(fetchPromises);
-        
-        realSensors = CITIES.map((city, index) => {
-            if (results[index].status === 'fulfilled' && results[index].value) {
-                return processAPIData(city, results[index].value);
-            }
-            return null;
-        }).filter(sensor => sensor !== null);
-        
-        if (realSensors.length > 0) {
-            apiStatus.textContent = `API: ONLINE (${realSensors.length}/${CITIES.length})`;
-            apiStatus.className = 'api-status';
-            
-            if (currentDataSource === 'api') {
-                updateDashboard();
-            }
-        } else {
-            throw new Error('No data received from any API endpoint');
-        }
-        
-    } catch (error) {
-        console.error('💥 API Update failed:', error);
-        apiStatus.textContent = 'API: OFFLINE';
-        apiStatus.className = 'api-status offline';
-        
-        if (currentDataSource === 'api') {
-            switchDataSource('demo');
-        }
-    }
+    // Update card borders based on AQI status
+    document.getElementById('libraryCard').className = `location-card ${libraryData.status}`;
+    document.getElementById('canteenCard').className = `location-card ${canteenData.status}`;
 }
 
 // ===============================
@@ -612,29 +535,30 @@ function updateDashboard() {
     const updateTime = new Date();
     document.getElementById('lastUpdate').textContent = `Last update: ${updateTime.toLocaleTimeString()}`;
     
-    let displaySensors = [];
+    let displayData = null;
     let dataSource = '';
     
     switch(currentDataSource) {
         case 'mqtt':
-            displaySensors = mqttSensor ? [mqttSensor] : [];
+            displayData = mqttSensor;
             dataSource = 'LIVE SENSOR';
-            // Show/hide real-time section
+            // Show real-time section
             document.getElementById('realtimeSection').style.display = mqttSensor ? 'block' : 'none';
             break;
-        case 'api':
-            displaySensors = realSensors;
-            dataSource = 'API DATA';
-            document.getElementById('realtimeSection').style.display = 'none';
-            break;
         case 'demo':
-            displaySensors = FALLBACK_SENSORS;
+            // Use average of both locations for main display
+            displayData = {
+                aqi: Math.round((DEMO_DATA.library.aqi + DEMO_DATA.canteen.aqi) / 2),
+                pm25: Math.round((DEMO_DATA.library.pm25 + DEMO_DATA.canteen.pm25) / 2),
+                temperature: Math.round((DEMO_DATA.library.temperature + DEMO_DATA.canteen.temperature) / 2),
+                humidity: Math.round((DEMO_DATA.library.humidity + DEMO_DATA.canteen.humidity) / 2)
+            };
             dataSource = 'DEMO DATA';
             document.getElementById('realtimeSection').style.display = 'none';
             break;
     }
     
-    if (displaySensors.length === 0) {
+    if (!displayData) {
         // No data available
         document.getElementById('mainAqi').textContent = '--';
         document.getElementById('mainStatus').textContent = 'No Data';
@@ -644,55 +568,22 @@ function updateDashboard() {
         return;
     }
     
-    // Calculate averages
-    const avgAqi = Math.round(displaySensors.reduce((sum, sensor) => sum + sensor.aqi, 0) / displaySensors.length);
-    const avgPM25 = Math.round(displaySensors.reduce((sum, sensor) => sum + sensor.pm25, 0) / displaySensors.length);
-    const avgTemp = Math.round(displaySensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / displaySensors.length);
-    const avgHumidity = Math.round(displaySensors.reduce((sum, sensor) => sum + sensor.humidity, 0) / displaySensors.length);
-    
     // Update main cards
     const aqiElement = document.getElementById('mainAqi');
-    aqiElement.textContent = avgAqi;
-    aqiElement.className = 'aqi-value ' + getAqiStatus(avgAqi);
-    document.getElementById('mainStatus').textContent = getAqiStatus(avgAqi).toUpperCase() + ' | ' + dataSource;
+    aqiElement.textContent = displayData.aqi;
+    aqiElement.className = 'aqi-value ' + getAqiStatus(displayData.aqi);
+    document.getElementById('mainStatus').textContent = getAqiStatus(displayData.aqi).toUpperCase() + ' | ' + dataSource;
     
-    document.getElementById('pm25Value').textContent = `${avgPM25} μg/m³`;
-    document.getElementById('pm25Status').textContent = getPM25Status(avgPM25);
-    document.getElementById('tempValue').textContent = `${avgTemp}°C`;
-    document.getElementById('tempStatus').textContent = getTempStatus(avgTemp);
-    document.getElementById('humidityValue').textContent = `${avgHumidity}%`;
-    document.getElementById('humidityStatus').textContent = getHumidityStatus(avgHumidity);
+    document.getElementById('pm25Value').textContent = `${displayData.pm25} μg/m³`;
+    document.getElementById('pm25Status').textContent = getPM25Status(displayData.pm25);
+    document.getElementById('tempValue').textContent = `${displayData.temperature}°C`;
+    document.getElementById('tempStatus').textContent = getTempStatus(displayData.temperature);
+    document.getElementById('humidityValue').textContent = `${displayData.humidity}%`;
+    document.getElementById('humidityStatus').textContent = getHumidityStatus(displayData.humidity);
     
-    // Update sensor grid and map
-    updateSensorGrid(displaySensors);
-    updateMapMarkers();
+    // Update location comparison
+    updateLocationComparison();
     updateChartsWithData();
-}
-
-function updateSensorGrid(sensors) {
-    const sensorGrid = document.getElementById('sensorGrid');
-    sensorGrid.innerHTML = '';
-
-    sensors.forEach(sensor => {
-        const sensorElement = document.createElement('div');
-        sensorElement.className = `sensor-item ${sensor.status}`;
-        const dataSource = sensor.isRealTime ? '🔥 LIVE' : (sensor.isRealData ? '🌐 API' : '📱 DEMO');
-        
-        sensorElement.innerHTML = `
-            <div class="sensor-header">
-                <span class="sensor-name">${sensor.name}</span>
-                <span class="sensor-aqi">AQI: ${sensor.aqi}</span>
-            </div>
-            <div class="sensor-details">
-                <p>PM2.5: ${sensor.pm25} μg/m³ | PM10: ${sensor.pm10} μg/m³</p>
-                <p>Temp: ${sensor.temperature}°C | Humidity: ${sensor.humidity}%</p>
-                ${sensor.gas ? `<p>Gas: ${sensor.gas} ppm</p>` : ''}
-                <p class="sensor-status">Status: <strong>${sensor.status.toUpperCase()}</strong> | ${dataSource}</p>
-                <small>Updated: ${new Date(sensor.lastUpdate).toLocaleTimeString()}</small>
-            </div>
-        `;
-        sensorGrid.appendChild(sensorElement);
-    });
 }
 
 // ===============================
@@ -717,11 +608,11 @@ function switchDataSource(source) {
 function startRealTimeUpdates() {
     console.log('⏰ Starting update intervals...');
     
-    // Initial API update
-    updateAllFromAPI();
+    // Initial update
+    updateDashboard();
     
-    // Update API data every 2 minutes
-    setInterval(updateAllFromAPI, 120000);
+    // Update data every 30 seconds
+    setInterval(updateDashboard, 30000);
     
     // Update charts every 30 seconds
     setInterval(updateChartsWithData, 30000);
@@ -753,14 +644,6 @@ function displayRawData(data) {
     }
 }
 
-function calculateAQI(pm25) {
-    if (pm25 <= 12) return Math.floor((pm25 / 12) * 50);
-    if (pm25 <= 35.4) return Math.floor(50 + ((pm25 - 12.1) / (35.4 - 12.1)) * 50);
-    if (pm25 <= 55.4) return Math.floor(100 + ((pm25 - 35.5) / (55.4 - 35.5)) * 50);
-    if (pm25 <= 150.4) return Math.floor(150 + ((pm25 - 55.5) / (150.4 - 55.5)) * 50);
-    return 200 + Math.floor((pm25 - 150.5) / 2);
-}
-
 function calculateAQIFromGas(gas) {
     // Simple conversion from gas ppm to AQI
     if (gas <= 50) return Math.floor((gas / 50) * 50);
@@ -773,15 +656,6 @@ function getAqiStatus(aqi) {
     if (aqi <= 50) return 'good';
     if (aqi <= 100) return 'moderate';
     return 'poor';
-}
-
-function getStatusColor(status) {
-    const colors = {
-        good: '#27ae60',
-        moderate: '#f39c12',
-        poor: '#e74c3c'
-    };
-    return colors[status] || '#3498db';
 }
 
 function getPM25Status(pm25) {
@@ -812,8 +686,5 @@ function getGasStatus(gas) {
 
 // Manual refresh function
 window.refreshData = function() {
-    updateAllFromAPI();
-    if (currentDataSource === 'demo') {
-        updateDashboard();
-    }
+    updateDashboard();
 };

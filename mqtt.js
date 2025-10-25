@@ -1,242 +1,558 @@
-// MQTT Configuration
-const MQTT_CONFIG = {
-    BROKER: "cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud",
-    PORT: 8883,
-    TOPIC: "esp32/sensor",
-    USERNAME: "adam1234",
-    PASSWORD: "Adam1234",
-    CLIENT_ID: "web_client_" + Math.random().toString(16).substr(2, 8)
+// ===============================
+// GLOBAL VARIABLES
+// ===============================
+
+let currentDataSource = 'demo'; // 'mqtt', 'demo'
+let mqttSensor = null;
+let map;
+let sensorMarkers = [];
+
+// Demo data for both locations
+const DEMO_DATA = {
+    library: {
+        aqi: 45,
+        pm25: 12,
+        temperature: 28,
+        humidity: 75,
+        gas: 45,
+        status: "good"
+    },
+    canteen: {
+        aqi: 68,
+        pm25: 25,
+        temperature: 29,
+        humidity: 72,
+        gas: 120,
+        status: "moderate"
+    }
 };
 
-class MQTTClient {
-    constructor() {
-        this.client = null;
-        this.isConnected = false;
-        this.sensorData = {
-            temperature: null,
-            humidity: null,
-            gas: null,
-            timestamp: null
-        };
-        this.history = {
-            temperature: [],
-            humidity: [],
-            gas: [],
-            timestamps: []
-        };
-        this.maxHistoryLength = 30;
-    }
+let mqttHistory = {
+    temperature: [],
+    humidity: [],
+    gas: [],
+    timestamps: []
+};
 
-    connect() {
-        this.client = new Paho.MQTT.Client(
-            MQTT_CONFIG.BROKER,
-            MQTT_CONFIG.PORT,
-            MQTT_CONFIG.CLIENT_ID
-        );
+const historicalData = {
+    labels: [],
+    aqi: [],
+    pm25: [],
+    temperature: [],
+    humidity: []
+};
 
-        // Set callback handlers
-        this.client.onConnectionLost = this.onConnectionLost.bind(this);
-        this.client.onMessageArrived = this.onMessageArrived.bind(this);
+// ===============================
+// INITIALIZATION
+// ===============================
 
-        // Connect the client
-        const connectOptions = {
-            useSSL: true,
-            userName: MQTT_CONFIG.USERNAME,
-            password: MQTT_CONFIG.PASSWORD,
-            onSuccess: this.onConnect.bind(this),
-            onFailure: this.onConnectFailure.bind(this),
-            timeout: 3,
-            keepAliveInterval: 60,
-            cleanSession: true
-        };
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Starting Campus Air Quality Dashboard...');
+    initializeMap();
+    initializeCharts();
+    setupMQTTListeners();
+    startRealTimeUpdates();
+    updateLocationComparison();
+});
 
-        console.log("Connecting to MQTT broker...");
-        this.client.connect(connectOptions);
-    }
+// ===============================
+// MQTT EVENT HANDLERS
+// ===============================
 
-    onConnect() {
-        console.log("Connected to MQTT broker");
-        this.isConnected = true;
-        this.updateConnectionStatus(true);
-        
-        // Subscribe to the topic
-        this.client.subscribe(MQTT_CONFIG.TOPIC);
-        console.log(`Subscribed to topic: ${MQTT_CONFIG.TOPIC}`);
-    }
-
-    onConnectFailure(response) {
-        console.error("Failed to connect to MQTT broker:", response.errorMessage);
-        this.isConnected = false;
-        this.updateConnectionStatus(false);
-        
-        // Try to reconnect after 5 seconds
-        setTimeout(() => {
-            console.log("Attempting to reconnect...");
-            this.connect();
-        }, 5000);
-    }
-
-    onConnectionLost(response) {
-        console.log("Connection lost:", response.errorMessage);
-        this.isConnected = false;
-        this.updateConnectionStatus(false);
-        
-        // Attempt reconnect
-        setTimeout(() => {
-            console.log("Attempting to reconnect...");
-            this.connect();
-        }, 3000);
-    }
-
-    onMessageArrived(message) {
-        try {
-            console.log("Message received:", message.payloadString);
-            const data = JSON.parse(message.payloadString);
-            this.processSensorData(data);
-        } catch (error) {
-            console.error("Error parsing MQTT message:", error);
-            this.displayRawData(message.payloadString);
+function setupMQTTListeners() {
+    // Listen for MQTT messages
+    mqttClient.onMessage(function(sensorData) {
+        if (sensorData.error) {
+            console.error('MQTT Error:', sensorData.error);
+            displayRawData('Error: ' + sensorData.error + '\nRaw: ' + sensorData.rawData);
+            return;
         }
-    }
-
-    processSensorData(data) {
-        const timestamp = new Date().toLocaleTimeString();
         
-        // Update current readings
-        this.sensorData = {
-            temperature: data.temperature !== undefined ? data.temperature : data.temp,
-            humidity: data.humidity !== undefined ? data.humidity : data.hum,
-            gas: data.gas !== undefined ? data.gas : data.gasLevel,
-            timestamp: timestamp
-        };
-
-        // Add to history
-        this.addToHistory(this.sensorData);
-
-        // Update UI
-        this.updateUI();
-        this.displayRawData(JSON.stringify(data, null, 2));
+        mqttSensor = sensorData;
+        displayRawData(JSON.stringify(sensorData.rawData, null, 2));
         
-        // Update charts if they exist
-        if (window.realtimeChart) {
-            this.updateCharts();
-        }
-    }
-
-    addToHistory(data) {
-        this.history.temperature.push(data.temperature);
-        this.history.humidity.push(data.humidity);
-        this.history.gas.push(data.gas);
-        this.history.timestamps.push(data.timestamp);
-
-        // Keep history length limited
-        if (this.history.temperature.length > this.maxHistoryLength) {
-            this.history.temperature.shift();
-            this.history.humidity.shift();
-            this.history.gas.shift();
-            this.history.timestamps.shift();
-        }
-    }
-
-    updateUI() {
-        // Update main cards
-        this.updateCard('tempValue', `${this.sensorData.temperature !== null ? this.sensorData.temperature.toFixed(1) : '--'} °C`);
-        this.updateCard('humidityValue', `${this.sensorData.humidity !== null ? this.sensorData.humidity.toFixed(1) : '--'} %`);
-        this.updateCard('gasValue', `${this.sensorData.gas !== null ? this.sensorData.gas.toFixed(1) : '--'} ppm`);
-        this.updateCard('systemStatus', 'Online', 'status-good');
-
-        // Update status texts
-        this.updateStatus('tempStatus', this.sensorData.temperature, 'Temperature');
-        this.updateStatus('humidityStatus', this.sensorData.humidity, 'Humidity');
-        this.updateStatus('gasStatus', this.sensorData.gas, 'Gas');
-
+        // Update MQTT history
+        updateMqttHistory(mqttSensor);
+        
         // Update gauges
-        this.updateGauge('tempGauge', this.sensorData.temperature, 0, 50, '°C');
-        this.updateGauge('humidityGauge', this.sensorData.humidity, 0, 100, '%');
-        this.updateGauge('gasGauge', this.sensorData.gas, 0, 1000, 'ppm');
-
-        // Update details
-        this.updateDetail('tempDetail', this.sensorData.temperature, '°C');
-        this.updateDetail('humidityDetail', this.sensorData.humidity, '%');
-        this.updateDetail('gasDetail', this.sensorData.gas, 'ppm');
-
-        // Update last update time
-        document.getElementById('lastUpdate').textContent = `Last update: ${this.sensorData.timestamp}`;
-    }
-
-    updateCard(elementId, value, statusClass = '') {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = value;
-            if (statusClass) {
-                element.className = `value ${statusClass}`;
-            }
+        updateMQTTGauges(mqttSensor);
+        
+        // Update location comparison
+        updateLocationComparison();
+        
+        // If currently viewing MQTT data, update dashboard
+        if (currentDataSource === 'mqtt') {
+            updateDashboard();
         }
+    });
+    
+    // Listen for MQTT status changes
+    mqttClient.onStatusChange(function(status) {
+        updateMQTTStatus(status);
+        updateMQTTToggleButton();
+    });
+}
+
+// ===============================
+// MAP FUNCTIONS
+// ===============================
+
+function initializeMap() {
+    const defaultLat = 9.21167230280324;
+    const defaultLng = 76.64228335554053;
+    const defaultZoom = 17;
+
+    map = L.map('map').setView([defaultLat, defaultLng], defaultZoom);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add markers for both locations
+    const locations = mqttClient.getLocations();
+    Object.keys(locations).forEach(locationKey => {
+        const location = locations[locationKey];
+        const marker = L.marker([location.lat, location.lng])
+            .addTo(map)
+            .bindPopup(`
+                <strong>${location.icon} ${location.name}</strong><br>
+                <em>Air Quality Monitoring Station</em>
+            `);
+        
+        marker.setIcon(
+            L.divIcon({
+                className: 'location-marker',
+                html: `<div style="background-color: #3498db; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 16px;">${location.icon}</div>`,
+                iconSize: [40, 40]
+            })
+        );
+        
+        sensorMarkers.push(marker);
+    });
+}
+
+// ===============================
+// MQTT-RELATED FUNCTIONS
+// ===============================
+
+function updateMqttHistory(sensor) {
+    const timestamp = new Date().toLocaleTimeString();
+    
+    mqttHistory.temperature.push(sensor.temperature);
+    mqttHistory.humidity.push(sensor.humidity);
+    mqttHistory.gas.push(sensor.gas);
+    mqttHistory.timestamps.push(timestamp);
+    
+    // Keep only last 20 readings
+    if (mqttHistory.temperature.length > 20) {
+        mqttHistory.temperature.shift();
+        mqttHistory.humidity.shift();
+        mqttHistory.gas.shift();
+        mqttHistory.timestamps.shift();
     }
+}
 
-    updateStatus(elementId, value, type) {
-        const element = document.getElementById(elementId);
-        if (element && value !== null) {
-            let status = 'Normal';
-            let statusClass = 'status-good';
+function updateMQTTGauges(sensor) {
+    // Update temperature gauge (0-50°C range)
+    updateGauge('tempGauge', sensor.temperature, 0, 50, '°C');
+    updateGaugeDetail('tempGaugeDetail', sensor.temperature, '°C', mqttClient.getTempStatus(sensor.temperature));
+    
+    // Update humidity gauge (0-100% range)
+    updateGauge('humidityGauge', sensor.humidity, 0, 100, '%');
+    updateGaugeDetail('humidityGaugeDetail', sensor.humidity, '%', mqttClient.getHumidityStatus(sensor.humidity));
+    
+    // Update gas gauge (0-1000 ppm range)
+    updateGauge('gasGauge', sensor.gas, 0, 1000, 'ppm');
+    updateGaugeDetail('gasDetail', sensor.gas, 'ppm', mqttClient.getGasStatus(sensor.gas));
+}
 
-            if (type === 'Temperature') {
-                if (value < 10) { status = 'Cold'; statusClass = 'status-moderate'; }
-                else if (value > 30) { status = 'Hot'; statusClass = 'status-poor'; }
-            } else if (type === 'Humidity') {
-                if (value < 30) { status = 'Dry'; statusClass = 'status-moderate'; }
-                else if (value > 70) { status = 'Humid'; statusClass = 'status-poor'; }
-            } else if (type === 'Gas') {
-                if (value > 300) { status = 'High'; statusClass = 'status-poor'; }
-                else if (value > 150) { status = 'Moderate'; statusClass = 'status-moderate'; }
-            }
-
-            element.textContent = status;
-            element.className = statusClass;
-        }
+function updateGauge(gaugeId, value, min, max, unit) {
+    const gauge = document.getElementById(gaugeId);
+    if (gauge && value !== null) {
+        const fill = gauge.querySelector('.gauge-fill');
+        const valueSpan = gauge.querySelector('.gauge-value');
+        
+        const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+        fill.style.width = `${percentage}%`;
+        valueSpan.textContent = `${value.toFixed(1)} ${unit}`;
     }
+}
 
-    updateGauge(gaugeId, value, min, max, unit) {
-        const gauge = document.getElementById(gaugeId);
-        if (gauge && value !== null) {
-            const fill = gauge.querySelector('.gauge-fill');
-            const valueSpan = gauge.querySelector('.gauge-value');
-            
-            const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
-            fill.style.width = `${percentage}%`;
-            valueSpan.textContent = `${value.toFixed(1)} ${unit}`;
-        }
+function updateGaugeDetail(elementId, value, unit, status) {
+    const element = document.getElementById(elementId);
+    if (element && value !== null) {
+        element.textContent = `${value.toFixed(1)}${unit} (${status})`;
     }
+}
 
-    updateDetail(elementId, value, unit) {
-        const element = document.getElementById(elementId);
-        if (element && value !== null) {
-            element.textContent = `${value.toFixed(1)}${unit}`;
-        }
+function toggleMQTT() {
+    const status = mqttClient.getStatus();
+    
+    if (status.isConnected) {
+        // Disconnect
+        mqttClient.disconnect();
+    } else {
+        // Reconnect
+        mqttClient.connect();
     }
+}
 
-    updateCharts() {
-        // This will be implemented in script.js
-        if (window.updateRealtimeCharts) {
-            window.updateRealtimeCharts(this.history);
-        }
-    }
-
-    updateConnectionStatus(connected) {
-        const statusElement = document.getElementById('connectionStatus');
-        if (statusElement) {
-            statusElement.textContent = connected ? '🟢 Connected' : '🔴 Disconnected';
-            statusElement.className = connected ? 'connected' : 'disconnected';
-        }
-    }
-
-    displayRawData(data) {
-        const rawDataElement = document.getElementById('rawData');
-        if (rawDataElement) {
-            rawDataElement.textContent = data;
+function updateMQTTToggleButton() {
+    const toggleBtn = document.getElementById('mqttToggle');
+    const status = mqttClient.getStatus();
+    
+    if (toggleBtn) {
+        if (status.isConnected) {
+            toggleBtn.textContent = '🔴 Stop MQTT';
+            toggleBtn.className = 'mqtt-toggle connected';
+        } else {
+            toggleBtn.textContent = '🟢 Start MQTT';
+            toggleBtn.className = 'mqtt-toggle disconnected';
         }
     }
 }
 
-// Initialize MQTT client
-const mqttClient = new MQTTClient();
+// ===============================
+// CHART FUNCTIONS
+// ===============================
+
+function initializeCharts() {
+    // AQI Trend Chart
+    const aqiCtx = document.getElementById('aqiChart').getContext('2d');
+    window.aqiChart = new Chart(aqiCtx, {
+        type: 'line',
+        data: {
+            labels: historicalData.labels,
+            datasets: [
+                {
+                    label: 'Library AQI',
+                    data: [],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Canteen AQI',
+                    data: [],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            animation: false
+        }
+    });
+
+    // Environment Chart
+    const envCtx = document.getElementById('environmentChart').getContext('2d');
+    window.environmentChart = new Chart(envCtx, {
+        type: 'line',
+        data: {
+            labels: historicalData.labels,
+            datasets: [
+                {
+                    label: 'Temperature (°C)',
+                    data: historicalData.temperature,
+                    borderColor: 'rgba(231, 76, 60, 0.8)',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Humidity (%)',
+                    data: historicalData.humidity,
+                    borderColor: 'rgba(52, 152, 219, 0.8)',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    }
+                },
+                y1: {
+                    position: 'right',
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Humidity (%)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateChartsWithData() {
+    const now = new Date();
+    const timeLabel = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    // Update labels
+    historicalData.labels.push(timeLabel);
+    if (historicalData.labels.length > 12) historicalData.labels.shift();
+    
+    // Get current data based on source
+    let currentData = null;
+    switch(currentDataSource) {
+        case 'mqtt':
+            if (mqttSensor) {
+                currentData = {
+                    aqi: mqttSensor.aqi,
+                    temperature: mqttSensor.temperature,
+                    humidity: mqttSensor.humidity
+                };
+            }
+            break;
+        case 'demo':
+            // Use average of both locations for demo data
+            currentData = {
+                aqi: Math.round((DEMO_DATA.library.aqi + DEMO_DATA.canteen.aqi) / 2),
+                temperature: Math.round((DEMO_DATA.library.temperature + DEMO_DATA.canteen.temperature) / 2),
+                humidity: Math.round((DEMO_DATA.library.humidity + DEMO_DATA.canteen.humidity) / 2)
+            };
+            break;
+    }
+    
+    if (currentData) {
+        // Update AQI data
+        historicalData.aqi.push(currentData.aqi);
+        if (historicalData.aqi.length > 12) historicalData.aqi.shift();
+        
+        // Update temperature data
+        historicalData.temperature.push(currentData.temperature);
+        if (historicalData.temperature.length > 12) historicalData.temperature.shift();
+        
+        // Update humidity data
+        historicalData.humidity.push(currentData.humidity);
+        if (historicalData.humidity.length > 12) historicalData.humidity.shift();
+    }
+    
+    // Update charts
+    if (window.aqiChart) {
+        window.aqiChart.data.labels = historicalData.labels;
+        // For demo, show both locations
+        if (currentDataSource === 'demo') {
+            window.aqiChart.data.datasets[0].data = Array(historicalData.labels.length).fill(DEMO_DATA.library.aqi);
+            window.aqiChart.data.datasets[1].data = Array(historicalData.labels.length).fill(DEMO_DATA.canteen.aqi);
+        } else {
+            window.aqiChart.data.datasets[0].data = historicalData.aqi;
+            window.aqiChart.data.datasets[1].data = historicalData.aqi;
+        }
+        window.aqiChart.update('none');
+    }
+    
+    if (window.environmentChart) {
+        window.environmentChart.data.labels = historicalData.labels;
+        window.environmentChart.data.datasets[0].data = historicalData.temperature;
+        window.environmentChart.data.datasets[1].data = historicalData.humidity;
+        window.environmentChart.update('none');
+    }
+}
+
+// ===============================
+// LOCATION COMPARISON FUNCTIONS
+// ===============================
+
+function updateLocationComparison() {
+    let libraryData, canteenData;
+    
+    if (currentDataSource === 'mqtt' && mqttSensor) {
+        // For MQTT data, show current sensor reading in one location and demo in the other
+        if (mqttSensor.location === 'library') {
+            libraryData = mqttSensor;
+            canteenData = DEMO_DATA.canteen;
+        } else {
+            libraryData = DEMO_DATA.library;
+            canteenData = mqttSensor;
+        }
+    } else {
+        // For demo data, use predefined values
+        libraryData = DEMO_DATA.library;
+        canteenData = DEMO_DATA.canteen;
+    }
+    
+    // Update Library card
+    document.getElementById('libraryAqi').textContent = libraryData.aqi;
+    document.getElementById('libraryAqi').className = getAqiStatus(libraryData.aqi);
+    document.getElementById('libraryTemp').textContent = libraryData.temperature + '°C';
+    document.getElementById('libraryHumidity').textContent = libraryData.humidity + '%';
+    document.getElementById('libraryGas').textContent = libraryData.gas + ' ppm';
+    
+    // Update Canteen card
+    document.getElementById('canteenAqi').textContent = canteenData.aqi;
+    document.getElementById('canteenAqi').className = getAqiStatus(canteenData.aqi);
+    document.getElementById('canteenTemp').textContent = canteenData.temperature + '°C';
+    document.getElementById('canteenHumidity').textContent = canteenData.humidity + '%';
+    document.getElementById('canteenGas').textContent = canteenData.gas + ' ppm';
+    
+    // Update card borders based on AQI status
+    document.getElementById('libraryCard').className = `location-card ${libraryData.status}`;
+    document.getElementById('canteenCard').className = `location-card ${canteenData.status}`;
+}
+
+// ===============================
+// DASHBOARD FUNCTIONS
+// ===============================
+
+function updateDashboard() {
+    const updateTime = new Date();
+    document.getElementById('lastUpdate').textContent = `Last update: ${updateTime.toLocaleTimeString()}`;
+    
+    let displayData = null;
+    let dataSource = '';
+    
+    switch(currentDataSource) {
+        case 'mqtt':
+            displayData = mqttSensor;
+            dataSource = 'LIVE SENSOR';
+            // Show real-time section
+            document.getElementById('realtimeSection').style.display = mqttSensor ? 'block' : 'none';
+            break;
+        case 'demo':
+            // Use average of both locations for main display
+            displayData = {
+                aqi: Math.round((DEMO_DATA.library.aqi + DEMO_DATA.canteen.aqi) / 2),
+                pm25: Math.round((DEMO_DATA.library.pm25 + DEMO_DATA.canteen.pm25) / 2),
+                temperature: Math.round((DEMO_DATA.library.temperature + DEMO_DATA.canteen.temperature) / 2),
+                humidity: Math.round((DEMO_DATA.library.humidity + DEMO_DATA.canteen.humidity) / 2)
+            };
+            dataSource = 'DEMO DATA';
+            document.getElementById('realtimeSection').style.display = 'none';
+            break;
+    }
+    
+    if (!displayData) {
+        // No data available
+        document.getElementById('mainAqi').textContent = '--';
+        document.getElementById('mainStatus').textContent = 'No Data';
+        document.getElementById('pm25Value').textContent = '-- μg/m³';
+        document.getElementById('tempValue').textContent = '--°C';
+        document.getElementById('humidityValue').textContent = '--%';
+        return;
+    }
+    
+    // Update main cards
+    const aqiElement = document.getElementById('mainAqi');
+    aqiElement.textContent = displayData.aqi;
+    aqiElement.className = 'aqi-value ' + getAqiStatus(displayData.aqi);
+    document.getElementById('mainStatus').textContent = getAqiStatus(displayData.aqi).toUpperCase() + ' | ' + dataSource;
+    
+    document.getElementById('pm25Value').textContent = `${displayData.pm25} μg/m³`;
+    document.getElementById('pm25Status').textContent = getPM25Status(displayData.pm25);
+    document.getElementById('tempValue').textContent = `${displayData.temperature}°C`;
+    document.getElementById('tempStatus').textContent = getTempStatus(displayData.temperature);
+    document.getElementById('humidityValue').textContent = `${displayData.humidity}%`;
+    document.getElementById('humidityStatus').textContent = getHumidityStatus(displayData.humidity);
+    
+    // Update location comparison
+    updateLocationComparison();
+    updateChartsWithData();
+}
+
+// ===============================
+// DATA SOURCE MANAGEMENT
+// ===============================
+
+function switchDataSource(source) {
+    currentDataSource = source;
+    
+    // Update toggle buttons
+    document.querySelectorAll('.source-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Update dashboard with new data source
+    updateDashboard();
+    
+    console.log(`🔄 Switched to data source: ${source}`);
+}
+
+function startRealTimeUpdates() {
+    console.log('⏰ Starting update intervals...');
+    
+    // Initial update
+    updateDashboard();
+    
+    // Update data every 30 seconds
+    setInterval(updateDashboard, 30000);
+    
+    // Update charts every 30 seconds
+    setInterval(updateChartsWithData, 30000);
+}
+
+// ===============================
+// HELPER FUNCTIONS
+// ===============================
+
+function updateMQTTStatus(status) {
+    const mqttStatus = document.getElementById('mqttStatus');
+    mqttStatus.textContent = `MQTT: ${status}`;
+    
+    if (status === 'CONNECTED' || status === 'LIVE DATA') {
+        mqttStatus.className = 'api-status';
+    } else if (status === 'CONNECTING') {
+        mqttStatus.className = 'api-status connecting';
+    } else {
+        mqttStatus.className = 'api-status offline';
+    }
+}
+
+function displayRawData(data) {
+    const rawDataElement = document.getElementById('rawData');
+    if (rawDataElement) {
+        rawDataElement.textContent = data;
+        // Auto-scroll to bottom
+        rawDataElement.scrollTop = rawDataElement.scrollHeight;
+    }
+}
+
+function getAqiStatus(aqi) {
+    if (aqi <= 50) return 'good';
+    if (aqi <= 100) return 'moderate';
+    return 'poor';
+}
+
+function getPM25Status(pm25) {
+    if (pm25 <= 12) return 'Good';
+    if (pm25 <= 35) return 'Moderate';
+    if (pm25 <= 55) return 'Unhealthy';
+    return 'Hazardous';
+}
+
+function getTempStatus(temp) {
+    if (temp >= 26 && temp <= 30) return 'Comfortable';
+    if (temp >= 22 && temp <= 32) return 'Normal';
+    return 'Extreme';
+}
+
+function getHumidityStatus(humidity) {
+    if (humidity >= 65 && humidity <= 75) return 'Ideal';
+    if (humidity >= 60 && humidity <= 80) return 'Normal';
+    return 'Extreme';
+}
+
+// Manual refresh function
+window.refreshData = function() {
+    updateDashboard();
+};

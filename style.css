@@ -190,6 +190,52 @@ header p {
     color: #7f8c8d;
 }
 
+/* Comparison Section */
+.comparison-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.location-card {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 4px solid #3498db;
+}
+
+.location-card h4 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-size: 1.2rem;
+}
+
+.data-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.data-item span:first-child {
+    font-weight: 600;
+    color: #7f8c8d;
+}
+
+.data-item span:last-child {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
 /* Raw Data Section */
 .raw-data-section {
     background: white;
@@ -235,48 +281,6 @@ header p {
     padding: 2rem;
     border-radius: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-/* Sensor List */
-.sensor-list {
-    background: white;
-    padding: 2rem;
-    border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.sensor-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.sensor-item {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 10px;
-    border-left: 4px solid #3498db;
-}
-
-.sensor-item.good { border-left-color: #27ae60; }
-.sensor-item.moderate { border-left-color: #f39c12; }
-.sensor-item.poor { border-left-color: #e74c3c; }
-
-.sensor-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.sensor-name {
-    font-weight: bold;
-    color: #2c3e50;
-}
-
-.sensor-aqi {
-    font-weight: bold;
 }
 
 /* Status Indicators */
@@ -339,5 +343,9 @@ header p {
     .connection-controls {
         flex-direction: column;
         align-items: center;
+    }
+    
+    .comparison-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -94,19 +94,68 @@
 
             <!-- Map Section -->
             <div class="map-section">
-                <h2>Live Sensor Map <span class="update-indicator">LIVE</span></h2>
+                <h2>Campus Sensor Map <span class="update-indicator">LIVE</span></h2>
                 <div id="map"></div>
             </div>
 
             <!-- Charts Section -->
             <div class="charts-section">
                 <div class="chart-container">
-                    <h3>Air Quality Trends (Last 24 Hours)</h3>
+                    <h3>Air Quality Trends (Last 2 Hours)</h3>
                     <canvas id="aqiChart"></canvas>
                 </div>
                 <div class="chart-container">
-                    <h3>Pollutant Levels</h3>
-                    <canvas id="pollutantChart"></canvas>
+                    <h3>Environmental Data</h3>
+                    <canvas id="environmentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Location Comparison -->
+            <div class="comparison-section">
+                <h3>🏫 Location Comparison</h3>
+                <div class="comparison-grid">
+                    <div class="location-card" id="libraryCard">
+                        <h4>📚 Library</h4>
+                        <div class="location-data">
+                            <div class="data-item">
+                                <span>AQI:</span>
+                                <span id="libraryAqi">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Temperature:</span>
+                                <span id="libraryTemp">--°C</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Humidity:</span>
+                                <span id="libraryHumidity">--%</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Gas:</span>
+                                <span id="libraryGas">-- ppm</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="location-card" id="canteenCard">
+                        <h4>🍽️ Canteen</h4>
+                        <div class="location-data">
+                            <div class="data-item">
+                                <span>AQI:</span>
+                                <span id="canteenAqi">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Temperature:</span>
+                                <span id="canteenTemp">--°C</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Humidity:</span>
+                                <span id="canteenHumidity">--%</span>
+                            </div>
+                            <div class="data-item">
+                                <span>Gas:</span>
+                                <span id="canteenGas">-- ppm</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -117,20 +166,16 @@
                     <pre id="rawData">Waiting for data from ESP32...</pre>
                 </div>
             </div>
-
-            <!-- Sensor List -->
-            <div class="sensor-list">
-                <h3>Active Sensors <span class="update-indicator">REAL-TIME</span></h3>
-                <div id="sensorGrid" class="sensor-grid">
-                    <!-- Sensors will be loaded here by JavaScript -->
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- JavaScript Libraries -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- MQTT Library and Custom MQTT Handler -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <script src="mqtt.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
