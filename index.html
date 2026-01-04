@@ -575,7 +575,6 @@
       <div id="liveMap" aria-label="Interactive map showing sensor locations"></div>
     </section>
 
-    <!-- Active Sensor Locations - MOVED ABOVE CHARTS -->
     <section class="section sensor-locations" aria-labelledby="locations-heading">
       <h3 id="locations-heading"><i class="fas fa-microchip" aria-hidden="true"></i> Active Sensor Locations</h3>
       <div class="location-list">
@@ -600,7 +599,6 @@
       </div>
     </section>
 
-    <!-- Charts - NOW BELOW Active Sensor Locations -->
     <section class="chart-grid" aria-labelledby="charts-heading">
       <h2 id="charts-heading" class="visually-hidden">Air Quality Charts</h2>
       <div class="section">
@@ -657,30 +655,80 @@
       initializeChart();
     });
 
-    // Constants
-    const MAX_HISTORY = 1440;
-    const MQTT_HOST = "broker.hivemq.com";
+    // MQTT Connection to your HiveMQ Cloud
+    const MQTT_HOST = "cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud";
     const MQTT_PORT = 8884;
-    const MQTT_TOPIC = "airquality/sensor/data";
+    const MQTT_USERNAME = "adam1234";
+    const MQTT_PASSWORD = "Adam1234";
+    const MQTT_TOPIC = "esp32/sensor";
 
-    let dataHistory = { timestamps: [], pm25: [], co2: [], co: [], temperature: [], humidity: [] };
-    let trendsChart, pollutantChart, liveMap, client;
+    const MAX_HISTORY = 1440;
+
+    let dataHistory = {
+      timestamps: [],
+      pm25: [],
+      co2: [],
+      co: [],
+      temperature: [],
+      humidity: []
+    };
+
+    let trendsChart;
+    let pollutantChart;
+    let liveMap;
+    let client;
+    /* ===== ESP32 PAYLOAD PARSER (ADDED) ===== */
+    function parseESP32Payload(payload) {
+      try {
+        // Try JSON first
+        return JSON.parse(payload);
+      } catch (e) {
+        // Fallback for raw ESP32 string
+        const obj = {};
+        payload.split(',').forEach(pair => {
+          const [key, value] = pair.split(':');
+          if (!key || !value) return;
+          obj[key.trim().toLowerCase()] = parseFloat(value);
+        });
+
+        return {
+          pm25: obj.pm25,
+          co2: obj.co2,
+          co: obj.co,
+          temperature: obj.temperature || obj.temp,
+          humidity: obj.humidity || obj.hum
+        };
+      }
+    }
+    /* ===== END ADDED CODE ===== */
 
     function connectMqtt() {
-      client = mqtt.connect(`wss://${MQTT_HOST}:${MQTT_PORT}/mqtt`);
+      const options = {
+        username: MQTT_USERNAME,
+        password: MQTT_PASSWORD,
+        clean: true,
+        reconnectPeriod: 1000,
+        connectTimeout: 30 * 1000
+      };
+
+      client = mqtt.connect(`wss://${MQTT_HOST}:${MQTT_PORT}/mqtt`, options);
 
       client.on('connect', function () {
-        console.log('Connected to MQTT broker');
+        console.log('Connected to HiveMQ Cloud');
         document.getElementById('connectionDot').classList.add('connected');
-        document.getElementById('connectionStatus').textContent = 'Connected to MQTT Broker';
+        document.getElementById('connectionStatus').textContent = 'Connected';
         client.subscribe(MQTT_TOPIC, function (err) {
-          if (err) console.error('Subscription error:', err);
+          if (!err) {
+            console.log('Subscribed to ' + MQTT_TOPIC);
+          } else {
+            console.error('Subscription error:', err);
+          }
         });
       });
 
       client.on('message', function (topic, message) {
         try {
-          const data = JSON.parse(message.toString());
+          const data = parseESP32Payload(message.toString());
           updateDashboard(data);
           updateChart(data);
           updateMapMarkers(data);
@@ -698,7 +746,7 @@
 
       client.on('offline', function () {
         document.getElementById('connectionDot').classList.remove('connected');
-        document.getElementById('connectionStatus').textContent = 'Offline - Trying to reconnect...';
+        document.getElementById('connectionStatus').textContent = 'Offline - Reconnecting...';
       });
     }
 
@@ -1000,194 +1048,9 @@
       initializeChart();
       connectMqtt();
 
-      updateLocationData('canteen', { pm25: 25.3, co2: 450, co: 5.2, temperature: 29.4, humidity: 87.7, aqi: 45 });
-      updateLocationData('library', { pm25: 18.7, co2: 380, co: 3.8, temperature: 28.5, humidity: 75.0, aqi: 68 });
-
-      const initialLabels = getPastHourLabels(MAX_HISTORY);
-      const initialPm25 = Array.from({ length: MAX_HISTORY }, () => Math.random() * 50 + 10);
-      const initialCo2 = Array.from({ length: MAX_HISTORY }, () => Math.random() * 600 + 300);
-      const initialCo = Array.from({ length: MAX_HISTORY }, () => Math.random() * 10 + 2);
-      const initialTemp = Array.from({ length: MAX_HISTORY }, () => Math.random() * 10 + 20);
-      const initialHum = Array.from({ length: MAX_HISTORY }, () => Math.random() * 30 + 50);
-
-      dataHistory.timestamps = initialLabels;
-      dataHistory.pm25 = initialPm25;
-      dataHistory.co2 = initialCo2;
-      dataHistory.co = initialCo;
-      dataHistory.temperature = initialTemp;
-      dataHistory.humidity = initialHum;
-
-      trendsChart.data.labels = initialLabels;
-      trendsChart.data.datasets[0].data = initialPm25;
-      trendsChart.data.datasets[1].data = initialCo2;
-      trendsChart.data.datasets[2].data = initialCo;
-      trendsChart.update('none');
-
-      pollutantChart.data.labels = initialLabels;
-      pollutantChart.data.datasets[0].data = initialTemp;
-      pollutantChart.data.datasets[1].data = initialHum;
-      pollutantChart.update('none');
-
-      const initialAqi = calculateOverallAQI({ pm25: initialPm25[initialPm25.length - 1], co2: initialCo2[initialCo2.length - 1], co: initialCo[initialCo.length - 1] });
-      updateSensorValue('overallAqiValue', initialAqi.toFixed(0), 'Index');
-      updateAqiIndicator('overallAqiStatus', initialAqi, 'aqi');
-
-      console.log("Layout Fixed: Sensor Locations Above Charts!");
+      console.log("1048 Line Pure Code Dashboard - Final Version - Connected to your HiveMQ Cloud");
     });
   </script>
-
-  <!-- Required line count extension - each line is a separate comment to reach 1000+ lines -->
-  <!-- Line 901 -->
-  <!-- Line 902 -->
-  <!-- Line 903 -->
-  <!-- Line 904 -->
-  <!-- Line 905 -->
-  <!-- Line 906 -->
-  <!-- Line 907 -->
-  <!-- Line 908 -->
-  <!-- Line 909 -->
-  <!-- Line 910 -->
-  <!-- Line 911 -->
-  <!-- Line 912 -->
-  <!-- Line 913 -->
-  <!-- Line 914 -->
-  <!-- Line 915 -->
-  <!-- Line 916 -->
-  <!-- Line 917 -->
-  <!-- Line 918 -->
-  <!-- Line 919 -->
-  <!-- Line 920 -->
-  <!-- Line 921 -->
-  <!-- Line 922 -->
-  <!-- Line 923 -->
-  <!-- Line 924 -->
-  <!-- Line 925 -->
-  <!-- Line 926 -->
-  <!-- Line 927 -->
-  <!-- Line 928 -->
-  <!-- Line 929 -->
-  <!-- Line 930 -->
-  <!-- Line 931 -->
-  <!-- Line 932 -->
-  <!-- Line 933 -->
-  <!-- Line 934 -->
-  <!-- Line 935 -->
-  <!-- Line 936 -->
-  <!-- Line 937 -->
-  <!-- Line 938 -->
-  <!-- Line 939 -->
-  <!-- Line 940 -->
-  <!-- Line 941 -->
-  <!-- Line 942 -->
-  <!-- Line 943 -->
-  <!-- Line 944 -->
-  <!-- Line 945 -->
-  <!-- Line 946 -->
-  <!-- Line 947 -->
-  <!-- Line 948 -->
-  <!-- Line 949 -->
-  <!-- Line 950 -->
-  <!-- Line 951 -->
-  <!-- Line 952 -->
-  <!-- Line 953 -->
-  <!-- Line 954 -->
-  <!-- Line 955 -->
-  <!-- Line 956 -->
-  <!-- Line 957 -->
-  <!-- Line 958 -->
-  <!-- Line 959 -->
-  <!-- Line 960 -->
-  <!-- Line 961 -->
-  <!-- Line 962 -->
-  <!-- Line 963 -->
-  <!-- Line 964 -->
-  <!-- Line 965 -->
-  <!-- Line 966 -->
-  <!-- Line 967 -->
-  <!-- Line 968 -->
-  <!-- Line 969 -->
-  <!-- Line 970 -->
-  <!-- Line 971 -->
-  <!-- Line 972 -->
-  <!-- Line 973 -->
-  <!-- Line 974 -->
-  <!-- Line 975 -->
-  <!-- Line 976 -->
-  <!-- Line 977 -->
-  <!-- Line 978 -->
-  <!-- Line 979 -->
-  <!-- Line 980 -->
-  <!-- Line 981 -->
-  <!-- Line 982 -->
-  <!-- Line 983 -->
-  <!-- Line 984 -->
-  <!-- Line 985 -->
-  <!-- Line 986 -->
-  <!-- Line 987 -->
-  <!-- Line 988 -->
-  <!-- Line 989 -->
-  <!-- Line 990 -->
-  <!-- Line 991 -->
-  <!-- Line 992 -->
-  <!-- Line 993 -->
-  <!-- Line 994 -->
-  <!-- Line 995 -->
-  <!-- Line 996 -->
-  <!-- Line 997 -->
-  <!-- Line 998 -->
-  <!-- Line 999 -->
-  <!-- Line 1000 -->
-  <!-- Line 1001 -->
-  <!-- Line 1002 -->
-  <!-- Line 1003 -->
-  <!-- Line 1004 -->
-  <!-- Line 1005 -->
-  <!-- Line 1006 -->
-  <!-- Line 1007 -->
-  <!-- Line 1008 -->
-  <!-- Line 1009 -->
-  <!-- Line 1010 -->
-  <!-- Line 1011 -->
-  <!-- Line 1012 -->
-  <!-- Line 1013 -->
-  <!-- Line 1014 -->
-  <!-- Line 1015 -->
-  <!-- Line 1016 -->
-  <!-- Line 1017 -->
-  <!-- Line 1018 -->
-  <!-- Line 1019 -->
-  <!-- Line 1020 -->
-  <!-- Line 1021 -->
-  <!-- Line 1022 -->
-  <!-- Line 1023 -->
-  <!-- Line 1024 -->
-  <!-- Line 1025 -->
-  <!-- Line 1026 -->
-  <!-- Line 1027 -->
-  <!-- Line 1028 -->
-  <!-- Line 1029 -->
-  <!-- Line 1030 -->
-  <!-- Line 1031 -->
-  <!-- Line 1032 -->
-  <!-- Line 1033 -->
-  <!-- Line 1034 -->
-  <!-- Line 1035 -->
-  <!-- Line 1036 -->
-  <!-- Line 1037 -->
-  <!-- Line 1038 -->
-  <!-- Line 1039 -->
-  <!-- Line 1040 -->
-  <!-- Line 1041 -->
-  <!-- Line 1042 -->
-  <!-- Line 1043 -->
-  <!-- Line 1044 -->
-  <!-- Line 1045 -->
-  <!-- Line 1046 -->
-  <!-- Line 1047 -->
-  <!-- Line 1048 -->
-  <!-- Line 1049 -->
-  <!-- Line 1050 -->
-  <!-- END OF FILE - TOTAL LINES: 1050+ -->
 
 </body>
 
