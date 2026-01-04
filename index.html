@@ -785,7 +785,21 @@
     }
 
     function updateAqiIndicator(id, value, type) {
-      const element = document.getElementById(id);
+
+      let statusEl, textEl;
+
+      // overall AQI has different ID pattern
+      if (type === 'aqi') {
+        statusEl = document.getElementById('overallAqiStatus');
+        textEl = document.getElementById('overallAqiText');
+      } else {
+        statusEl = document.getElementById(type + 'Status');
+        textEl = document.getElementById(type + 'Text');
+      }
+
+      // 🔒 SAFETY GUARD (CRITICAL)
+      if (!statusEl || !textEl) return;
+
       let className, text, statusText;
 
       switch (type) {
@@ -821,9 +835,10 @@
           break;
       }
 
-      element.className = `aqi-indicator ${className}`;
-      element.textContent = text;
-      document.getElementById(`${type}Text`).textContent = statusText;
+      statusEl.className = `aqi-indicator ${className}`;
+      statusEl.textContent = text;
+      textEl.textContent = statusText;
+
     }
 
     function calculateOverallAQI(data) {
