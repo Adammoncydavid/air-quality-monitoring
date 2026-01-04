@@ -679,27 +679,29 @@
     let client;
     /* ===== ESP32 PAYLOAD PARSER (ADDED) ===== */
     function parseESP32Payload(payload) {
-      try {
-        // Try JSON first
-        return JSON.parse(payload);
-      } catch (e) {
-        // Fallback for raw ESP32 string
-        const obj = {};
-        payload.split(',').forEach(pair => {
-          const [key, value] = pair.split(':');
-          if (!key || !value) return;
-          obj[key.trim().toLowerCase()] = parseFloat(value);
-        });
+  let raw;
 
-        return {
-          pm25: obj.pm25,
-          co2: obj.co2,
-          co: obj.co,
-          temperature: obj.temperature || obj.temp,
-          humidity: obj.humidity || obj.hum
-        };
-      }
-    }
+  try {
+    raw = JSON.parse(payload);   // JSON payload
+  } catch (e) {
+    raw = {};                    // string payload
+    payload.split(',').forEach(pair => {
+      const [key, value] = pair.split(':');
+      if (!key || !value) return;
+      raw[key.trim().toLowerCase()] = parseFloat(value);
+    });
+  }
+
+  // ✅ NORMALIZE KEYS FOR DASHBOARD
+  return {
+    pm25: raw.pm25,
+    co2: raw.co2,
+    co: raw.co,
+    temperature: raw.temperature ?? raw.temp,
+    humidity: raw.humidity ?? raw.hum
+  };
+}
+
     /* ===== END ADDED CODE ===== */
 
     function connectMqtt() {
