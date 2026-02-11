@@ -13,461 +13,280 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100;300;400;600;800&family=JetBrains+Mono:wght@400&display=swap');
+
     :root {
-      --bg-body: #f0f2f5;
-      --bg-card: white;
-      --text-primary: #1e293b;
-      --text-secondary: #64748b;
-      --text-muted: #475569;
-      --border: #e2e8f0;
-      --shadow: rgba(0, 0, 0, 0.1);
-      --highlight-bg: #dbeafe;
+      --bg-body: #f4f7ff;
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.7);
+      --text-main: #0a0f1d;
+      --text-dim: #5c6784;
+      --accent: #4f46e5;
+      --accent-glow: rgba(79, 70, 229, 0.4);
+      --success: #10b981;
+      --card-blur: 25px;
+      --border-radius: 30px;
+      --inner-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
     }
 
     [data-theme="dark"] {
-      --bg-body: #0f172a;
-      --bg-card: #1e293b;
-      --text-primary: #f1f5f9;
-      --text-secondary: #cbd5e1;
-      --text-muted: #94a3b8;
-      --border: #334155;
-      --shadow: rgba(0, 0, 0, 0.4);
-      --highlight-bg: #1e3a8a;
+      --bg-body: #05070a;
+      --glass-bg: rgba(13, 17, 28, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.05);
+      --text-main: #ffffff;
+      --text-dim: #94a3b8;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.5);
+      --inner-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
     }
 
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     body {
+      font-family: 'Outfit', sans-serif;
       background: var(--bg-body);
+      color: var(--text-main);
       min-height: 100vh;
-      color: var(--text-primary);
-      line-height: 1.6;
       overflow-x: hidden;
-      transition: background 0.3s ease, color 0.3s ease;
+      /* Animated mesh gradient background */
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
     }
 
     .container {
-      max-width: 1400px;
+      max-width: 1500px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 40px;
     }
 
+    /* --- The Ultra Header --- */
     .header {
-      background: var(--bg-card);
-      padding: 30px 20px;
-      text-align: center;
-      border-radius: 20px;
-      box-shadow: 0 8px 32px var(--shadow);
-      margin-bottom: 30px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius);
+      padding: 80px 40px;
+      box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.1);
       position: relative;
+      overflow: hidden;
+      margin-bottom: 50px;
+      box-shadow: var(--inner-shadow), 0 20px 40px rgba(0, 0, 0, 0.05);
     }
 
     .header h1 {
-      color: var(--text-primary);
-      font-size: 2.8rem;
-      font-weight: 700;
-      margin-bottom: 10px;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      line-height: 0.9;
+      background: linear-gradient(to right, var(--text-main) 30%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .header p {
-      color: var(--text-secondary);
-      font-size: 1.2rem;
+      margin-top: 15px;
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
       font-weight: 600;
     }
 
-    .theme-toggle {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: none;
-      border: none;
-      font-size: 1.6rem;
-      cursor: pointer;
-      color: var(--text-primary);
-      padding: 8px;
-      border-radius: 50%;
-    }
-
-    .theme-toggle:hover {
-      background: rgba(0, 0, 0, 0.1);
-    }
-
-    [data-theme="dark"] .theme-toggle:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
+    /* --- Bento Grid Status --- */
     .status-bar {
+      background: var(--glass-bg);
+      backdrop-filter: blur(15px);
+      border: 1px solid var(--glass-border);
+      border-radius: 100px;
+      padding: 15px 40px;
+      margin-bottom: 40px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: var(--bg-card);
-      padding: 15px 25px;
-      border-radius: 16px;
-      margin-bottom: 30px;
-      box-shadow: 0 6px 25px var(--shadow);
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .connection-status {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      box-shadow: var(--inner-shadow);
     }
 
     .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #ff4757;
+      width: 8px;
+      height: 8px;
+      position: relative;
     }
 
     .status-dot.connected {
-      background: #22c55e;
+      background: var(--success);
+      box-shadow: 0 0 20px var(--success), 0 0 40px var(--success);
+      animation: breathing 2s ease-in-out infinite;
     }
 
+    @keyframes breathing {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.6;
+        transform: scale(1.5);
+      }
+    }
+
+    /* --- High-End Sensor Cards --- */
     .dashboard {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 25px;
-      margin-bottom: 40px;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 30px;
+      margin-bottom: 60px;
     }
 
     .sensor-card {
-      background: var(--bg-card);
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 10px 35px var(--shadow);
-      transition: all 0.3s ease;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius);
+      padding: 45px;
+      transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+      box-shadow: var(--inner-shadow), 0 10px 30px rgba(0, 0, 0, 0.02);
+      position: relative;
     }
 
-    .sensor-card:hover,
-    .sensor-card:focus-within {
-      transform: translateY(-8px);
-      outline: 3px solid #3b82f6;
+    .sensor-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--border-radius);
+      padding: 2px;
+      background: linear-gradient(135deg, var(--glass-border), transparent);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
     }
 
-    .sensor-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
+    .sensor-card:hover {
+      transform: translateY(-15px);
+      background: rgba(255, 255, 255, 0.85);
+      border-color: var(--accent);
+      box-shadow: 0 40px 80px -20px var(--accent-glow);
+    }
+
+    [data-theme="dark"] .sensor-card:hover {
+      background: rgba(20, 25, 40, 0.9);
     }
 
     .sensor-title {
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: var(--text-primary);
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
     }
 
     .sensor-value {
-      font-size: 3rem;
-      font-weight: 800;
-      color: var(--text-primary);
-      text-align: center;
+      font-size: 5rem;
+      font-weight: 100;
       margin: 20px 0;
-    }
-
-    #overallAqiValue {
-      font-size: 3.6rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      letter-spacing: -0.05em;
     }
 
     .sensor-unit {
-      font-size: 1.3rem;
-      color: var(--text-secondary);
-      margin-left: 6px;
+      font-size: 1.2rem;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-left: 10px;
+      letter-spacing: 0;
     }
 
-    .sensor-footer {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-secondary);
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .aqi-indicator {
-      padding: 8px 20px;
-      border-radius: 50px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      color: white;
-    }
-
-    .aqi-good {
-      background: #22c55e;
-    }
-
-    .aqi-moderate {
-      background: #f59e0b;
-    }
-
-    .aqi-poor {
-      background: #ef4444;
-    }
-
+    /* --- Charts & Map --- */
     .section {
-      background: var(--bg-card);
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 10px 35px var(--shadow);
-      margin-bottom: 35px;
-    }
-
-    .section h2,
-    .section h3 {
-      color: var(--text-primary);
-      margin-bottom: 20px;
-      font-size: 1.6rem;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--card-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius);
+      padding: 40px;
+      box-shadow: var(--inner-shadow);
     }
 
     #liveMap {
-      height: 520px;
-      border-radius: 16px;
+      height: 600px;
+      border-radius: 20px;
+      filter: saturate(1.2) brightness(1.1);
     }
 
-    .chart-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-      gap: 30px;
-      margin-bottom: 40px;
+    [data-theme="dark"] #liveMap {
+      filter: invert(100%) hue-rotate(180deg) brightness(0.7) contrast(0.9);
     }
 
-    .chart-container {
-      position: relative;
-      height: 400px;
-      width: 100%;
+    /* --- Buttons & UI --- */
+    .theme-toggle {
+      width: 60px;
+      height: 60px;
+      border-radius: 20px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-main);
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
-    .chart-container canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100% !important;
-      height: 100% !important;
-    }
-
-    .location-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-      gap: 25px;
-    }
-
-    .location-card {
-      padding: 25px;
-      border-radius: 16px;
-      box-shadow: 0 6px 25px var(--shadow);
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-    }
-
-    .location-card h4 {
-      color: var(--text-primary);
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      font-size: 1.3rem;
-    }
-
-    .realtime-tag {
-      background: #22c55e;
+    .theme-toggle:hover {
+      transform: scale(1.1) rotate(-10deg);
+      background: var(--accent);
       color: white;
-      padding: 6px 14px;
-      border-radius: 30px;
-      font-size: 0.8rem;
-      font-weight: 700;
-    }
-
-    .location-card p {
-      margin: 10px 0;
-      font-size: 1rem;
-      color: var(--text-muted);
     }
 
     #rawData {
-      background: var(--bg-body);
-      padding: 20px;
-      border-radius: 12px;
-      font-family: monospace;
-      max-height: 320px;
-      overflow-y: auto;
-      color: var(--text-primary);
-      border: 1px solid var(--border);
+      background: #000;
+      color: #00ff41;
+      /* Matrix green */
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      border-radius: 20px;
+      padding: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      line-height: 1.8;
     }
 
-    .last-update {
-      text-align: center;
-      color: var(--text-secondary);
-      margin-top: 30px;
-      font-size: 1rem;
-    }
-
-    .visually-hidden {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-
-    :focus-visible {
-      outline: 3px solid #3b82f6;
-      outline-offset: 2px;
-    }
-
-    .skip-link {
-      position: absolute;
-      top: -40px;
-      left: 6px;
-      background: #1e293b;
-      color: white;
-      padding: 8px;
-      z-index: 100;
-    }
-
-    .skip-link:focus {
-      top: 6px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-
-    @media (max-width: 1200px) {
-      .chart-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .chart-container {
-        height: 380px;
-      }
-
-      #liveMap {
-        height: 450px;
-      }
-    }
-
-    @media (max-width: 992px) {
-      .container {
-        padding: 15px;
-      }
-
-      .header h1 {
-        font-size: 2.4rem;
-      }
-
-      .sensor-value {
-        font-size: 2.6rem;
-      }
-
-      #overallAqiValue {
-        font-size: 3.2rem;
-      }
-
-      .location-list {
-        grid-template-columns: 1fr;
-      }
-
-      .chart-container {
-        height: 360px;
-      }
-    }
-
-    @media (max-width: 768px) {
-      .header h1 {
-        font-size: 2.1rem;
-      }
-
-      .status-bar {
-        flex-direction: column;
-        gap: 15px;
-        text-align: center;
-        padding: 20px;
-      }
-
-      .dashboard {
-        grid-template-columns: 1fr;
-      }
-
-      .sensor-value {
-        font-size: 2.4rem;
-      }
-
-      #overallAqiValue {
-        font-size: 2.8rem;
-      }
-
-      #liveMap {
-        height: 380px;
-      }
-
-      .chart-container {
-        height: 340px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .header h1 {
-        font-size: 1.8rem;
-      }
-
-      .sensor-value {
-        font-size: 2.2rem;
-      }
-
-      #overallAqiValue {
-        font-size: 2.6rem;
-      }
-
-      .aqi-indicator {
-        padding: 6px 14px;
-        font-size: 0.8rem;
-      }
-
-      #liveMap {
-        height: 300px;
-      }
-
-      .chart-container {
-        height: 300px;
-      }
-    }
-
-    @keyframes highlight {
+    /* --- Interactive Micro-animations --- */
+    @keyframes pulse-update {
       0% {
-        background-color: var(--highlight-bg);
+        transform: scale(1);
+        filter: brightness(1);
+      }
+
+      50% {
+        transform: scale(1.02);
+        filter: brightness(1.3) drop-shadow(0 0 10px var(--accent));
       }
 
       100% {
-        background-color: transparent;
+        transform: scale(1);
+        filter: brightness(1);
       }
     }
 
     .data-update {
-      animation: highlight 1.5s ease;
+      animation: pulse-update 0.6s cubic-bezier(0.2, 0, 0.2, 1);
+    }
+
+    /* Custom Chart Overrides */
+    canvas {
+      filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.05));
     }
   </style>
+
 </head>
 
 <body>
@@ -481,7 +300,7 @@
         <i class="fas fa-sun" id="sunIcon" style="display:none;"></i>
       </button>
       <h1>Air Quality Monitoring Dashboard</h1>
-      <p>Real-time Environmental Monitoring System</p>
+      <p>Real-time Air Quality Monitoring System</p>
     </header>
 
     <div class="status-bar" role="status" aria-live="polite">
@@ -577,26 +396,50 @@
 
     <section class="section sensor-locations" aria-labelledby="locations-heading">
       <h3 id="locations-heading"><i class="fas fa-microchip" aria-hidden="true"></i> Active Sensor Locations</h3>
-      <div class="location-list">
-        <article class="location-card" id="canteenCard" aria-labelledby="canteen-heading">
-          <h4 id="canteen-heading">Canteen <span class="realtime-tag">Live</span></h4>
-          <p>PM2.5: <span id="canteenPm25" aria-live="polite">-- μg/m³</span></p>
-          <p>CO2: <span id="canteenCo2" aria-live="polite">-- ppm</span></p>
-          <p>CO: <span id="canteenCo" aria-live="polite">-- ppm</span></p>
-          <p>Temperature: <span id="canteenTemp" aria-live="polite">-- °C</span></p>
-          <p>Humidity: <span id="canteenHum" aria-live="polite">-- %</span></p>
-          <p>AQI: <span id="canteenAqi" aria-live="polite">--</span></p>
+
+      <section class="section selector-panel" aria-labelledby="locations-heading">
+        <h3 id="locations-heading"><i class="fas fa-university" aria-hidden="true"></i> Campus Navigation</h3>
+
+        <div class="selection-grid">
+          <div class="dropdown-group">
+            <label for="blockSelect">Select Block</label>
+            <select id="blockSelect" class="custom-select">
+              <option value="">-- Select Block --</option>
+            </select>
+          </div>
+
+          <div class="dropdown-group">
+            <label for="floorSelect">Select Floor</label>
+            <select id="floorSelect" class="custom-select" disabled>
+              <option value="">-- Select Floor --</option>
+            </select>
+          </div>
+
+          <div class="dropdown-group">
+            <label for="roomSelect">Select Room</label>
+            <select id="roomSelect" class="custom-select" disabled>
+              <option value="">-- Select Room --</option>
+            </select>
+          </div>
+        </div>
+
+
+        <article class="location-card focused-room" id="activeRoomCard">
+          <div class="room-header">
+            <h4 id="currentRoomDisplay">Room A101</h4>
+            <span class="realtime-tag">Monitoring Active</span>
+          </div>
+          <div class="room-stats-grid">
+            <div class="mini-stat"><span>PM2.5:</span> <strong id="roomPm25">--</strong></div>
+            <div class="mini-stat"><span>CO2:</span> <strong id="roomCo2">--</strong></div>
+            <div class="mini-stat"><span>CO:</span> <strong id="roomCo">--</strong></div>
+            <div class="mini-stat"><span>Temp:</span> <strong id="roomTemp">--</strong></div>
+            <div class="mini-stat"><span>Hum:</span> <strong id="roomHum">--</strong></div>
+            <div class="mini-stat"><span>AQI:</span> <strong id="roomAqi">--</strong></div>
+          </div>
         </article>
-        <article class="location-card" id="libraryCard" aria-labelledby="library-heading">
-          <h4 id="library-heading">Library <span class="realtime-tag">Live</span></h4>
-          <p>PM2.5: <span id="libraryPm25" aria-live="polite">-- μg/m³</span></p>
-          <p>CO2: <span id="libraryCo2" aria-live="polite">-- ppm</span></p>
-          <p>CO: <span id="libraryCo" aria-live="polite">-- ppm</span></p>
-          <p>Temperature: <span id="libraryTemp" aria-live="polite">-- °C</span></p>
-          <p>Humidity: <span id="libraryHum" aria-live="polite">-- %</span></p>
-          <p>AQI: <span id="libraryAqi" aria-live="polite">--</span></p>
-        </article>
-      </div>
+      </section>
+
     </section>
 
     <section class="chart-grid" aria-labelledby="charts-heading">
@@ -679,28 +522,28 @@
     let client;
     /* ===== ESP32 PAYLOAD PARSER (ADDED) ===== */
     function parseESP32Payload(payload) {
-  let raw;
+      let raw;
 
-  try {
-    raw = JSON.parse(payload);   // JSON payload
-  } catch (e) {
-    raw = {};                    // string payload
-    payload.split(',').forEach(pair => {
-      const [key, value] = pair.split(':');
-      if (!key || !value) return;
-      raw[key.trim().toLowerCase()] = parseFloat(value);
-    });
-  }
+      try {
+        raw = JSON.parse(payload);   // JSON payload
+      } catch (e) {
+        raw = {};                    // string payload
+        payload.split(',').forEach(pair => {
+          const [key, value] = pair.split(':');
+          if (!key || !value) return;
+          raw[key.trim().toLowerCase()] = parseFloat(value);
+        });
+      }
 
-  // ✅ NORMALIZE KEYS FOR DASHBOARD
-  return {
-    pm25: raw.pm25,
-    co2: raw.co2,
-    co: raw.co,
-    temperature: raw.temperature ?? raw.temp,
-    humidity: raw.humidity ?? raw.hum
-  };
-}
+      // ✅ NORMALIZE KEYS FOR DASHBOARD
+      return {
+        pm25: raw.pm25,
+        co2: raw.co2,
+        co: raw.co,
+        temperature: raw.temperature ?? raw.temp,
+        humidity: raw.humidity ?? raw.hum
+      };
+    }
 
     /* ===== END ADDED CODE ===== */
 
@@ -806,30 +649,50 @@
 
       switch (type) {
         case 'pm25':
-          if (value <= 12) { className = 'aqi-good'; text = 'Good'; statusText = 'Excellent'; }
-          else if (value <= 35) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Acceptable'; }
-          else { className = 'aqi-poor'; text = 'Poor'; statusText = 'Unhealthy'; }
+          if (value <= 30) {
+            className = 'aqi-good'; text = 'Good'; statusText = 'Excellent';
+          } else if (value <= 37) {
+            className = 'aqi-moderate'; text = 'Average'; statusText = 'Acceptable';
+          } else {
+            className = 'aqi-poor'; text = 'Bad'; statusText = 'Unhealthy';
+          }
           break;
+
         case 'co2':
           if (value <= 400) { className = 'aqi-good'; text = 'Good'; statusText = 'Fresh Air'; }
           else if (value <= 1000) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Normal'; }
           else { className = 'aqi-poor'; text = 'Poor'; statusText = 'High'; }
           break;
         case 'co':
-          if (value <= 9) { className = 'aqi-good'; text = 'Good'; statusText = 'Safe'; }
-          else if (value <= 35) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Caution'; }
-          else { className = 'aqi-poor'; text = 'Poor'; statusText = 'Dangerous'; }
+          if (value <= 2) {
+            className = 'aqi-good'; text = 'Good'; statusText = 'Safe';
+          } else if (value <= 9) {
+            className = 'aqi-moderate'; text = 'Average'; statusText = 'Caution';
+          } else {
+            className = 'aqi-poor'; text = 'Bad'; statusText = 'Dangerous';
+          }
           break;
+
         case 'temp':
-          if (value >= 18 && value <= 25) { className = 'aqi-good'; text = 'Comfortable'; statusText = 'Ideal'; }
-          else if (value >= 10 && value < 18 || value > 25 && value <= 30) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Fair'; }
-          else { className = 'aqi-poor'; text = 'Extreme'; statusText = 'Uncomfortable'; }
+          if (value <= 35) {
+            className = 'aqi-good'; text = 'Good'; statusText = 'Comfortable';
+          } else if (value <= 40) {
+            className = 'aqi-moderate'; text = 'Average'; statusText = 'Warm';
+          } else {
+            className = 'aqi-poor'; text = 'Bad'; statusText = 'Too Hot';
+          }
           break;
+
         case 'hum':
-          if (value >= 30 && value <= 60) { className = 'aqi-good'; text = 'Normal'; statusText = 'Comfortable'; }
-          else if (value >= 20 && value < 30 || value > 60 && value <= 70) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Fair'; }
-          else { className = 'aqi-poor'; text = 'High/Low'; statusText = 'Uncomfortable'; }
+          if (value <= 60) {
+            className = 'aqi-good'; text = 'Good'; statusText = 'Comfortable';
+          } else if (value <= 70) {
+            className = 'aqi-moderate'; text = 'Average'; statusText = 'Slightly Humid';
+          } else {
+            className = 'aqi-poor'; text = 'Bad'; statusText = 'Uncomfortable';
+          }
           break;
+
         case 'aqi':
           if (value <= 50) { className = 'aqi-good'; text = 'Good'; statusText = 'Excellent'; }
           else if (value <= 100) { className = 'aqi-moderate'; text = 'Moderate'; statusText = 'Acceptable'; }
@@ -945,35 +808,29 @@
       const textColor = isDark ? '#f1f5f9' : '#1e293b';
       const gridColor = isDark ? '#334155' : '#e2e8f0';
 
-      const ctxTrends = document.getElementById('trendsChart').getContext('2d');
-      trendsChart = new Chart(ctxTrends, {
+      /* ===== AIR QUALITY TRENDS (PM2.5, CO2, CO) ===== */
+      trendsChart = new Chart(document.getElementById('trendsChart'), {
         type: 'line',
         data: {
-          labels: getPastHourLabels(6),
+          labels: [], // REAL timestamps only
           datasets: [
             {
               label: 'PM2.5 (μg/m³)',
-              data: [12, 15, 18, 20, 22, 25],
-              borderColor: '#ef4444',
-              backgroundColor: 'rgba(239, 68, 60, 0.2)',
-              fill: true,
+              data: [],
               tension: 0.4,
+              fill: true
             },
             {
               label: 'CO2 (ppm)',
-              data: [400, 450, 500, 550, 600, 650],
-              borderColor: '#3b82f6',
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              fill: true,
+              data: [],
               tension: 0.4,
+              fill: true
             },
             {
               label: 'CO (ppm)',
-              data: [5, 6, 7, 8, 9, 10],
-              borderColor: '#22c55e',
-              backgroundColor: 'rgba(34, 197, 94, 0.2)',
-              fill: true,
+              data: [],
               tension: 0.4,
+              fill: true
             }
           ]
         },
@@ -981,32 +838,28 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { beginAtZero: true, title: { display: true, text: 'Levels', color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
-            x: { ticks: { color: textColor }, grid: { color: gridColor } }
+            x: { ticks: { color: textColor }, grid: { color: gridColor } },
+            y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } }
           },
           plugins: { legend: { labels: { color: textColor } } }
         }
       });
 
-      const ctxPollutant = document.getElementById('pollutantChart').getContext('2d');
-      pollutantChart = new Chart(ctxPollutant, {
+      /* ===== POLLUTANT LEVELS (TEMP, HUMIDITY) ===== */
+      pollutantChart = new Chart(document.getElementById('pollutantChart'), {
         type: 'line',
         data: {
-          labels: getPastHourLabels(6),
+          labels: [],
           datasets: [
             {
               label: 'Temperature (°C)',
-              data: [20, 30, 20, 28, 27, 25],
-              borderColor: '#ef4444',
-              backgroundColor: 'rgba(239, 68, 60, 0.1)',
+              data: [],
               tension: 0.4,
               yAxisID: 'y'
             },
             {
               label: 'Humidity (%)',
-              data: [80, 70, 85, 75, 78, 79],
-              borderColor: '#3b82f6',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              data: [],
               tension: 0.4,
               yAxisID: 'y1'
             }
@@ -1016,8 +869,19 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: { beginAtZero: false, position: 'left', title: { display: true, text: 'Temp (°C)', color: textColor }, ticks: { color: textColor }, grid: { color: gridColor }, min: 15, max: 40 },
-            y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Humidity (%)', color: textColor }, ticks: { color: textColor }, grid: { drawOnChartArea: false }, min: 0, max: 100 }
+            y: {
+              position: 'left',
+              title: { display: true, text: 'Temperature (°C)', color: textColor },
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            },
+            y1: {
+              position: 'right',
+              title: { display: true, text: 'Humidity (%)', color: textColor },
+              ticks: { color: textColor },
+              grid: { drawOnChartArea: false }
+            },
+            x: { ticks: { color: textColor }, grid: { color: gridColor } }
           },
           plugins: { legend: { labels: { color: textColor } } }
         }
@@ -1025,25 +889,22 @@
     }
 
     function updateChart(data) {
-      const now = new Date();
-      const timeLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const timestamp = new Date().toLocaleTimeString();
 
-      if (data.pm25 !== undefined) dataHistory.pm25.push(data.pm25);
-      if (data.co2 !== undefined) dataHistory.co2.push(data.co2);
-      if (data.co !== undefined) dataHistory.co.push(data.co);
-      if (data.temperature !== undefined) dataHistory.temperature.push(data.temperature);
-      if (data.humidity !== undefined) dataHistory.humidity.push(data.humidity);
-      dataHistory.timestamps.push(timeLabel);
+      /* PUSH REAL DATA */
+      dataHistory.timestamps.push(timestamp);
+      dataHistory.pm25.push(data.pm25 ?? null);
+      dataHistory.co2.push(data.co2 ?? null);
+      dataHistory.co.push(data.co ?? null);
+      dataHistory.temperature.push(data.temperature ?? null);
+      dataHistory.humidity.push(data.humidity ?? null);
 
+      /* KEEP LAST 24 HOURS (1440 points @ 1/min) */
       if (dataHistory.timestamps.length > MAX_HISTORY) {
-        dataHistory.timestamps.shift();
-        dataHistory.pm25.shift();
-        dataHistory.co2.shift();
-        dataHistory.co.shift();
-        dataHistory.temperature.shift();
-        dataHistory.humidity.shift();
+        Object.keys(dataHistory).forEach(key => dataHistory[key].shift());
       }
 
+      /* UPDATE TRENDS CHART */
       if (trendsChart) {
         trendsChart.data.labels = dataHistory.timestamps;
         trendsChart.data.datasets[0].data = dataHistory.pm25;
@@ -1052,6 +913,7 @@
         trendsChart.update('none');
       }
 
+      /* UPDATE POLLUTANT CHART */
       if (pollutantChart) {
         pollutantChart.data.labels = dataHistory.timestamps;
         pollutantChart.data.datasets[0].data = dataHistory.temperature;
@@ -1059,6 +921,131 @@
         pollutantChart.update('none');
       }
     }
+
+
+    /* ===== CAMPUS STRUCTURE DATA ===== */
+    const campusData = {
+      "Main Block": {
+        "Ground Floor": {
+          dept: "Biotechnology & Biochemical Engineering",
+          rooms: ["A101", "A102", "A103", "A104", "A105", "A106", "A107", "A108"]
+        },
+        "First Floor": {
+          dept: "Food Technology Engineering",
+          rooms: ["A201", "A202", "A203", "A204", "A205", "A206", "A207", "A208"]
+        },
+        "Second Floor": {
+          dept: "Electronics & Communication Engineering",
+          rooms: ["A301", "A302", "A303", "A304", "A305", "A306", "A307", "A308"]
+        }
+      },
+
+      "Civil Block": {
+        "Ground Floor": {
+          dept: "Civil Engineering",
+          rooms: ["B101", "B102", "B103", "B104", "B105", "B106", "B107", "B108"]
+        },
+        "First Floor": {
+          dept: "Civil Engineering",
+          rooms: ["B201", "B202", "B203", "B204", "B205", "B206", "B207", "B208", "B209"]
+        },
+        "Second Floor": {
+          dept: "Electronics & Computer Engineering",
+          rooms: ["B301", "B302", "B303", "B304", "B305", "B306", "B307", "B308"]
+        }
+      },
+
+      "CS Block": {
+        "Ground Floor": {
+          dept: "Computer Science & Engineering",
+          rooms: ["C101", "C102", "C103", "C104", "C105", "C106", "C107", "C108"]
+        },
+        "First Floor": {
+          dept: "Computer Science & Engineering",
+          rooms: ["C201", "C202", "C203", "C204", "C205", "C206", "C207", "C208"]
+        },
+        "Second Floor": {
+          dept: "AI & Machine Learning",
+          rooms: ["C301", "C302", "C303", "C304", "C305", "C306", "C307", "C308"]
+        }
+      },
+
+      "Mechanical Block": {
+        "Ground Floor": {
+          dept: "Mechanical Engineering",
+          rooms: ["M101", "M102", "M103", "M104", "M105", "M106", "M107", "M108"]
+        },
+        "First Floor": {
+          dept: "Mechanical Engineering",
+          rooms: ["M201", "M202", "M203", "M204", "M205", "M206", "M207", "M208"]
+        },
+        "Second Floor": {
+          dept: "Electrical & Electronics Engineering",
+          rooms: ["M301", "M302", "M303", "M304", "M305", "M306", "M307", "M308"]
+        }
+      }
+    };
+
+    /* ===== DROPDOWN LOGIC ===== */
+    const blockSelect = document.getElementById("blockSelect");
+    const floorSelect = document.getElementById("floorSelect");
+    const roomSelect = document.getElementById("roomSelect");
+    const roomDisplay = document.getElementById("currentRoomDisplay");
+
+    /* Populate Blocks */
+    Object.keys(campusData).forEach(block => {
+      const option = document.createElement("option");
+      option.value = block;
+      option.textContent = block;
+      blockSelect.appendChild(option);
+    });
+
+    /* Block → Floor */
+    blockSelect.addEventListener("change", () => {
+      floorSelect.innerHTML = '<option value="">-- Select Floor --</option>';
+      roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
+      floorSelect.disabled = true;
+      roomSelect.disabled = true;
+
+      const block = blockSelect.value;
+      if (!block) return;
+
+      Object.keys(campusData[block]).forEach(floor => {
+        const option = document.createElement("option");
+        option.value = floor;
+        option.textContent = `${floor} (${campusData[block][floor].dept})`;
+        floorSelect.appendChild(option);
+      });
+
+      floorSelect.disabled = false;
+    });
+
+    /* Floor → Room */
+    floorSelect.addEventListener("change", () => {
+      roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
+      roomSelect.disabled = true;
+
+      const block = blockSelect.value;
+      const floor = floorSelect.value;
+      if (!block || !floor) return;
+
+      campusData[block][floor].rooms.forEach(room => {
+        const option = document.createElement("option");
+        option.value = room;
+        option.textContent = room;
+        roomSelect.appendChild(option);
+      });
+
+      roomSelect.disabled = false;
+    });
+
+    /* Room Selection */
+    roomSelect.addEventListener("change", () => {
+      if (roomSelect.value) {
+        roomDisplay.textContent = `Room ${roomSelect.value}`;
+      }
+    });
+
 
     window.addEventListener('load', function () {
       initializeMap();
