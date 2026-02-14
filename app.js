@@ -16,12 +16,15 @@ themeToggle.addEventListener('click', () => {
         localStorage.setItem('theme', 'light');
         moonIcon.style.display = 'inline';
         sunIcon.style.display = 'none';
+        if (liveMap) liveMap.getContainer().style.filter = "saturate(1.2) brightness(1.1)";
     } else {
         document.body.setAttribute('data-theme', 'dark');
         localStorage.setItem('theme', 'dark');
         moonIcon.style.display = 'none';
         sunIcon.style.display = 'inline';
+        if (liveMap) liveMap.getContainer().style.filter = "invert(100%) hue-rotate(180deg) brightness(0.7) contrast(0.9)";
     }
+    // Re-render charts to pick up new colors
     if (trendsChart) trendsChart.destroy();
     if (pollutantChart) pollutantChart.destroy();
     initializeChart();
@@ -662,8 +665,17 @@ roomSelect.addEventListener("change", () => {
 
 
 window.addEventListener('load', function () {
-    initializeMap();
-    initializeChart();
+    // 1. Initialize Components Safely
+    try {
+        if (typeof L !== 'undefined') initializeMap();
+        else console.error("Leaflet (L) not loaded");
+    } catch (e) { console.error("Map Init Failed", e); }
+
+    try {
+        if (typeof Chart !== 'undefined') initializeChart();
+        else console.error("Chart.js not loaded");
+    } catch (e) { console.error("Chart Init Failed", e); }
+
     connectMqtt();
 
     /* ===== PWA REGISTRATION ===== */
@@ -791,21 +803,34 @@ window.addEventListener('load', function () {
 
 
 
-    // 22. Research Mode Export
+    // 22. Research Mode Export (PDF)
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) {
+        exportBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Export Data (PDF)'; // Update Label
         exportBtn.addEventListener('click', () => {
-            let csv = "Time,PM2.5,CO2,Temperature,Humidity\n";
-            dataHistory.timestamps.forEach((t, i) => {
-                csv += `${t},${dataHistory.pm25[i]},${dataHistory.co2[i]},${dataHistory.temperature[i]},${dataHistory.humidity[i]}\n`;
+            const { jsPDF } = window.jspdf;
+            if (!jsPDF) { alert("PDF Library not loaded"); return; }
+
+            const doc = new jsPDF();
+            doc.text("AeroSense - Air Quality Report", 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+            const tableData = dataHistory.timestamps.map((t, i) => [
+                t,
+                dataHistory.pm25[i]?.toFixed(1) || '-',
+                dataHistory.co2[i]?.toFixed(0) || '-',
+                dataHistory.temperature[i]?.toFixed(1) || '-',
+                dataHistory.humidity[i]?.toFixed(1) || '-'
+            ]);
+
+            doc.autoTable({
+                head: [['Time', 'PM2.5', 'CO2', 'Temp', 'Hum']],
+                body: tableData,
+                startY: 30,
             });
 
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `AeroSense_Data_${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
+            doc.save(`AeroSense_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
         });
     }
 
