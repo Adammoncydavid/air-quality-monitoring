@@ -696,6 +696,22 @@ window.addEventListener('load', function () {
         document.getElementById('chatModal').style.display = 'none';
     });
 
+    // Settings Modal
+    const settingsBtn = document.getElementById('settingsBtn');
+    const closeSettings = document.getElementById('closeSettings');
+    const settingsModal = document.getElementById('settingsModal');
+
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.style.display = 'flex';
+        });
+    }
+    if (closeSettings) {
+        closeSettings.addEventListener('click', () => {
+            settingsModal.style.display = 'none';
+        });
+    }
+
     document.getElementById('sendChat').addEventListener('click', () => {
         const input = document.getElementById('chatInput');
         const history = document.getElementById('chatHistory');
@@ -773,20 +789,7 @@ window.addEventListener('load', function () {
 
     /* ===== SMART FEATURES LOGIC ===== */
 
-    // 9. Exam Mode
-    const examToggle = document.getElementById('examModeToggle');
-    if (examToggle) {
-        examToggle.addEventListener('change', (e) => {
-            const isExam = e.target.checked;
-            if (isExam && window.AeroAdmin) {
-                AeroAdmin.setThreshold('co2', 800); // Stricter
-                alert("[EXAM MODE] Activated: CO2 Threshold set to 800ppm (Strict)");
-            } else if (window.AeroAdmin) {
-                AeroAdmin.setThreshold('co2', 1000); // Normal
-                alert("[EXAM MODE] Deactivated: CO2 Threshold restored to 1000ppm");
-            }
-        });
-    }
+
 
     // 22. Research Mode Export
     const exportBtn = document.getElementById('exportBtn');
@@ -822,20 +825,7 @@ window.addEventListener('load', function () {
             document.body.style.border = "none";
         }
 
-        // Fan Logic
-        const co2Val = parseFloat(document.getElementById('co2Value').textContent) || 400;
-        const fanStatus = document.getElementById('fanStatus');
-        if (fanStatus) {
-            if (co2Val > 800) {
-                fanStatus.textContent = "ON (Auto)";
-                fanStatus.style.background = "#dcfce7";
-                fanStatus.style.color = "#166534";
-            } else {
-                fanStatus.textContent = "OFF";
-                fanStatus.style.background = "#e0e7ff";
-                fanStatus.style.color = "#4338ca";
-            }
-        }
+
 
         /* ===== RESEARCH MODULE UPDATES ===== */
         if (window.AeroResearch) {

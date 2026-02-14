@@ -11,13 +11,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="styles.css" />
     <link rel="manifest" href="manifest.json" />
-    <script src="js/analysis.js"></script>
-    <script src="js/campus.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/research.js"></script>
+    <script src="analysis.js"></script>
+    <script src="campus.js"></script>
+    <script src="auth.js"></script>
+    <script src="db.js"></script>
+    <script src="research.js"></script>
 </head>
 
 <body>
@@ -33,7 +33,9 @@
 
             <div style="position: absolute; right: 40px; top: 80px; display: flex; align-items: center;">
                 <button class="nav-btn" id="langBtn">EN/ML</button>
-                <button class="nav-btn" id="loginBtn">Login</button>
+                <button class="nav-btn admin-only" id="settingsBtn" style="display:none;"><i class="fas fa-cog"></i>
+                    Settings</button>
+                <button class="nav-btn" id="loginBtn">View Mode</button>
             </div>
 
             <h1 data-i18n="title">Air Quality Monitoring Dashboard</h1>
@@ -209,22 +211,7 @@
 
                     <!-- New Smart Features -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1);">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <label style="font-size: 0.9rem; font-weight: 600;"><i class="fas fa-user-graduate"></i>
-                                Exam Mode</label>
-                            <label class="switch">
-                                <input type="checkbox" id="examModeToggle">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <label style="font-size: 0.9rem; font-weight: 600;"><i class="fas fa-fan"></i> Smart
-                                Fan</label>
-                            <span id="fanStatus"
-                                style="font-size: 0.8rem; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 4px;">OFF</span>
-                        </div>
+
                         <button class="nav-btn" id="exportBtn" style="width: 100%; font-size: 0.8rem;"><i
                                 class="fas fa-download"></i> Export Data (CSV)</button>
                     </div>
@@ -329,14 +316,14 @@
     <div class="modal" id="loginModal">
         <div class="modal-content">
             <button class="close-btn" id="closeLogin">&times;</button>
-            <h2>Select Role</h2>
+            <h2>Select View Mode</h2>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
                 <button class="nav-btn"
-                    onclick="AeroAuth.login('student'); document.getElementById('loginModal').style.display='none'">Student</button>
+                    onclick="AeroAuth.login('student'); document.getElementById('loginModal').style.display='none'">
+                    <i class="fas fa-eye"></i> Standard View (Public)</button>
                 <button class="nav-btn"
-                    onclick="AeroAuth.login('faculty'); document.getElementById('loginModal').style.display='none'">Faculty</button>
-                <button class="nav-btn"
-                    onclick="AeroAuth.login('admin'); document.getElementById('loginModal').style.display='none'">Admin</button>
+                    onclick="AeroAuth.login('admin'); document.getElementById('loginModal').style.display='none'">
+                    <i class="fas fa-tools"></i> Expert View (Admin)</button>
             </div>
         </div>
     </div>
@@ -359,75 +346,68 @@
         </div>
     </div>
 
-    <script src="js/app.js"></script>
-    <script src="js/maintenance.js"></script> <!-- Load Last -->
+    <!-- Admin/Settings Modal (Consolidated) -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <button class="close-btn" id="closeSettings">&times;</button>
+            <h2><i class="fas fa-tools"></i> Device Settings & Reports</h2>
 
-    <!-- Admin Panel (Hidden by default) -->
-    <section class="section admin-only" id="adminPanel" style="margin-top: 40px; display: none;">
-        <h2><i class="fas fa-tools"></i> Admin & Maintenance Hub</h2>
+            <div class="dashboard"
+                style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 20px;">
 
-        <div class="dashboard" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                <!-- 8. Reports -->
+                <article class="sensor-card">
+                    <h3><i class="fas fa-file-pdf"></i> Reports</h3>
+                    <button class="nav-btn" onclick="AeroAdmin.generateReport('Weekly')"
+                        style="margin-top: 10px; width: 100%;">Download Weekly Report</button>
+                    <button class="nav-btn" onclick="AeroAdmin.generateReport('Monthly')"
+                        style="margin-top: 10px; width: 100%;">Download Monthly Report</button>
+                </article>
 
-            <!-- 8. Reports -->
-            <article class="sensor-card">
-                <h3><i class="fas fa-file-pdf"></i> Reports</h3>
-                <button class="nav-btn" onclick="AeroAdmin.generateReport('Weekly')"
-                    style="margin-top: 10px; width: 100%;">Download Weekly Report</button>
-                <button class="nav-btn" onclick="AeroAdmin.generateReport('Monthly')"
-                    style="margin-top: 10px; width: 100%;">Download Monthly Report</button>
-            </article>
+                <!-- 24. Thresholds -->
+                <article class="sensor-card">
+                    <h3><i class="fas fa-sliders-h"></i> Thresholds</h3>
+                    <div style="margin-top: 10px;">
+                        <label>CO2 Alarm (ppm):</label>
+                        <input type="number" value="1000" onchange="AeroAdmin.setThreshold('co2', this.value)"
+                            style="width: 100%; padding: 5px; margin-bottom: 10px;">
+                        <label>PM2.5 Alarm:</label>
+                        <input type="number" value="35" onchange="AeroAdmin.setThreshold('pm25', this.value)"
+                            style="width: 100%; padding: 5px;">
+                    </div>
+                </article>
 
+                <!-- 12. Compare Classrooms -->
+                <article class="sensor-card" style="grid-column: span 2;">
+                    <h3><i class="fas fa-balance-scale"></i> Classroom Comparison</h3>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <select id="compRoom1" class="nav-btn" style="flex:1;">
+                            <option>CS Lab 1</option>
+                            <option>Lecture Hall A</option>
+                        </select>
+                        <select id="compRoom2" class="nav-btn" style="flex:1;">
+                            <option>Bio Lab 2</option>
+                            <option>Library</option>
+                        </select>
+                        <button class="nav-btn" id="compareBtn"
+                            style="background: var(--accent); color: white;">Compare</button>
+                    </div>
+                    <div id="compareResult"
+                        style="margin-top: 15px; display: none; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px;">
+                        <!-- Results -->
+                    </div>
+                </article>
 
+                <!-- 29. Audit Log -->
+                <article class="sensor-card">
+                    <h3><i class="fas fa-history"></i> Audit Log</h3>
+                    <ul id="auditLogList"
+                        style="list-style: none; padding: 0; margin-top: 10px; font-size: 0.85rem; max-height: 150px; overflow-y: auto;">
+                        <!-- Populated by JS -->
+                        <li>Loading logs...</li>
+                    </ul>
+                </article>
 
-            <!-- 24. Thresholds -->
-            <article class="sensor-card">
-                <h3><i class="fas fa-sliders-h"></i> Thresholds</h3>
-                <div style="margin-top: 10px;">
-                    <label>CO2 Alarm (ppm):</label>
-                    <input type="number" value="1000" onchange="AeroAdmin.setThreshold('co2', this.value)"
-                        style="width: 100%; padding: 5px; margin-bottom: 10px;">
-                    <label>PM2.5 Alarm:</label>
-                    <input type="number" value="35" onchange="AeroAdmin.setThreshold('pm25', this.value)"
-                        style="width: 100%; padding: 5px;">
-                </div>
-            </article>
-
-            <!-- 12. Compare Classrooms -->
-            <article class="sensor-card" style="grid-column: span 2;">
-                <h3><i class="fas fa-balance-scale"></i> Classroom Comparison</h3>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <select id="compRoom1" class="nav-btn" style="flex:1;">
-                        <option>CS Lab 1</option>
-                        <option>Lecture Hall A</option>
-                    </select>
-                    <select id="compRoom2" class="nav-btn" style="flex:1;">
-                        <option>Bio Lab 2</option>
-                        <option>Library</option>
-                    </select>
-                    <button class="nav-btn" id="compareBtn"
-                        style="background: var(--accent); color: white;">Compare</button>
-                </div>
-                <div id="compareResult"
-                    style="margin-top: 15px; display: none; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px;">
-                    <!-- Results -->
-                </div>
-            </article>
-
-            <!-- 29. Audit Log -->
-            <article class="sensor-card">
-                <h3><i class="fas fa-history"></i> Audit Log</h3>
-                <ul id="auditLogList"
-                    style="list-style: none; padding: 0; margin-top: 10px; font-size: 0.85rem; max-height: 150px; overflow-y: auto;">
-                    <!-- Populated by JS -->
-                    <li>Loading logs...</li>
-                </ul>
-            </article>
-
+            </div>
         </div>
-
-
-    </section>
-
-</body>
-
-</html>
+    </div>
