@@ -807,6 +807,7 @@ window.addEventListener('load', function () {
     }
 
     // 25. Smart Fan Simulation (Loop update)
+    // 25. Smart Fan Simulation (Loop update)
     setInterval(() => {
         // 14. Emergency CO Leak Protocol
         const coVal = parseFloat(document.getElementById('coValue').textContent) || 0;
@@ -835,7 +836,73 @@ window.addEventListener('load', function () {
                 fanStatus.style.color = "#4338ca";
             }
         }
+
+        /* ===== RESEARCH MODULE UPDATES ===== */
+        if (window.AeroResearch) {
+            const pm25Val = parseFloat(document.getElementById('pm25Value').textContent) || 0;
+            const aqiVal = parseFloat(document.getElementById('overallAqiStatus')?.previousElementSibling?.textContent) || 0;
+
+            // 15. Compliance
+            const compliance = AeroResearch.checkCompliance(pm25Val, co2Val);
+            const complWho = document.getElementById('complWho');
+            const complAshrae = document.getElementById('complAshrae');
+
+            if (complWho) {
+                complWho.textContent = compliance.compliant ? "Pass" : "Fail";
+                complWho.style.color = compliance.compliant ? "green" : "red";
+            }
+            if (complAshrae) {
+                complAshrae.textContent = co2Val < 1000 ? "Pass" : "Fail";
+                complAshrae.style.color = co2Val < 1000 ? "green" : "red";
+            }
+
+            // 10. Academic Impact
+            const impact = AeroResearch.getAcademicImpact(co2Val);
+            const cogText = document.getElementById('cognitionText');
+            const cogBar = document.getElementById('cognitionBar');
+            const cogLoss = document.getElementById('cogLoss');
+
+            if (cogText) cogText.textContent = `${impact.score} learning environment.`;
+            if (cogBar) {
+                cogBar.style.width = impact.score === "Optimal" ? "100%" : impact.score === "Good" ? "80%" : "40%";
+                cogBar.style.background = impact.color;
+            }
+            if (cogLoss) cogLoss.textContent = impact.cognitiveLoss;
+
+            // 4. Asthma Mode
+            const asthmaToggle = document.getElementById('asthmaToggle');
+            const asthmaText = document.getElementById('asthmaText');
+            if (asthmaToggle && asthmaToggle.checked) {
+                const advisory = AeroResearch.getHealthAdvisory(aqiVal, co2Val, true);
+                if (asthmaText) asthmaText.textContent = advisory;
+                if (advisory.includes("ALERT")) {
+                    AeroResearch.sendPushNotification("Asthma Alert", "High pollution levels detected. Take precautions.");
+                }
+            } else if (asthmaText) {
+                asthmaText.textContent = "Strict alerts for sensitive individuals.";
+            }
+
+            // 9. Tampering
+            const currentData = { co2: co2Val, pm25: pm25Val };
+            const tampering = AeroResearch.detectTampering(currentData);
+            if (tampering) console.warn(tampering);
+        }
+
     }, 5000);
+
+    // 2. Long-Term Storage (Save every 1 min)
+    setInterval(() => {
+        if (window.AeroDB) {
+            const data = {
+                pm25: parseFloat(document.getElementById('pm25Value').textContent) || 0,
+                co2: parseFloat(document.getElementById('co2Value').textContent) || 0,
+                co: parseFloat(document.getElementById('coValue').textContent) || 0,
+                temperature: parseFloat(document.getElementById('tempValue').textContent) || 0,
+                humidity: parseFloat(document.getElementById('humValue').textContent) || 0
+            };
+            AeroDB.saveReading(data);
+        }
+    }, 60000);
 
     console.log("1048 Line Pure Code Dashboard - Updated with Smart Features");
 });

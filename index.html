@@ -16,6 +16,8 @@
     <script src="js/analysis.js"></script>
     <script src="js/campus.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/research.js"></script>
 </head>
 
 <body>
@@ -243,6 +245,49 @@
                     <small>Based on CO2 & Energy Efficiency</small>
                 </div>
             </article>
+
+            <!-- 15. Real Indoor Compliance (New) -->
+            <article class="sensor-card" style="margin-top: 20px; border-left: 5px solid #3b82f6;">
+                <h3><i class="fas fa-balance-scale-right"></i> Standards Compliance</h3>
+                <div style="margin-top: 10px; font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>WHO (PM2.5 < 15):</span>
+                                <strong id="complWho" style="color: green;">Pass</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>ASHRAE (CO2 < 1000):</span>
+                                <strong id="complAshrae" style="color: green;">Pass</strong>
+                    </div>
+                </div>
+            </article>
+
+            <!-- 10. Academic Impact (New) -->
+            <article class="sensor-card" style="margin-top: 20px;">
+                <h3><i class="fas fa-brain"></i> Cognitive Impact</h3>
+                <p id="cognitionText" style="font-size: 0.9rem; margin-top: 5px;">Optimal learning environment.</p>
+                <div class="progress-bar" style="background:#eee; height:10px; border-radius:5px; margin-top:5px;">
+                    <div id="cognitionBar" style="width: 100%; height:100%; background: green; border-radius:5px;">
+                    </div>
+                </div>
+                <small style="display:block; text-align:right; margin-top:2px;">Est. Cognitive Loss: <span
+                        id="cogLoss">0%</span></small>
+            </article>
+
+            <!-- 4. Asthma Mode Toggle -->
+            <div
+                style="margin-top: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-weight: bold; color: #d946ef;"><i class="fas fa-lungs"></i> Asthma/Sensitive
+                        Mode</label>
+                    <label class="switch">
+                        <input type="checkbox" id="asthmaToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <p id="asthmaText" style="font-size: 0.85rem; color: #666; margin-top: 5px;">Strict alerts for sensitive
+                    individuals.</p>
+            </div>
+
         </section>
 
         </section>
