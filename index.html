@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AeroSense — Indoor Air Quality Dashboard</title>
+  <meta name="description"
+    content="Real-time indoor air quality monitoring dashboard powered by IoT sensors and AI. Monitor PM2.5, CO2, CO, temperature, and humidity." />
+
+  <!-- Libraries -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Design System -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- ══════════════════════════════════════════════════════════
+     APP SHELL
+══════════════════════════════════════════════════════════ -->
+  <div class="app-shell">
+
+    <!-- ── Top Navigation ─────────────────────────────────── -->
+    <header class="topbar" role="banner">
+      <a href="#" class="topbar-logo" aria-label="AeroSense Home">
+        <div class="topbar-logo-icon" aria-hidden="true">🍃</div>
+        <span class="topbar-logo-name">AeroSense</span>
+      </a>
+
+      <div class="topbar-divider" aria-hidden="true"></div>
+      <span class="topbar-project">Indoor Air Quality</span>
+
+      <div class="topbar-spacer"></div>
+
+      <div class="topbar-actions">
+        <span class="last-update-text" id="lastUpdateText" aria-live="polite">--</span>
+
+        <!-- Connection status -->
+        <div class="conn-pill" role="status" aria-live="polite" aria-label="MQTT connection status">
+          <div class="conn-dot" id="connDot" aria-hidden="true"></div>
+          <span id="connStatus">Connecting…</span>
+        </div>
+
+        <!-- API Status -->
+        <span class="api-pill" id="apiPill" aria-live="polite">API: —</span>
+
+        <!-- Refresh -->
+        <button class="icon-btn" id="refreshBtn" title="Refresh data" aria-label="Refresh data">
+          <i class="fas fa-rotate-right" aria-hidden="true"></i>
+        </button>
+
+        <!-- Theme toggle -->
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle light/dark theme">
+          <i class="fas fa-sun" id="themeIcon" aria-hidden="true"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Sidebar ─────────────────────────────────────────── -->
+    <aside class="sidebar" aria-label="Navigation">
+      <p class="sidebar-section-label">Overview</p>
+      <ul class="sidebar-nav" role="list">
+        <li class="active">
+          <a href="#main-content">
+            <i class="fas fa-gauge-high nav-icon" aria-hidden="true"></i>
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <a href="#charts-section">
+            <i class="fas fa-chart-line nav-icon" aria-hidden="true"></i>
+            Trends
+          </a>
+        </li>
+        <li>
+          <a href="#raw-panel">
+            <i class="fas fa-terminal nav-icon" aria-hidden="true"></i>
+            Raw Stream
+          </a>
+        </li>
+      </ul>
+
+
+      <p class="sidebar-section-label">System</p>
+      <ul class="sidebar-nav" role="list">
+        <li>
+          <a href="https://cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud" target="_blank" rel="noopener">
+            <i class="fas fa-tower-broadcast nav-icon" aria-hidden="true"></i>
+            MQTT Broker
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- ── Main Content ────────────────────────────────────── -->
+    <main class="main-content" id="main-content" tabindex="-1">
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div>
+          <h1>Air Quality Dashboard</h1>
+          <p>Real-time monitoring · ESP32 + MQTT · IoT + AI</p>
+        </div>
+      </div>
+
+      <!-- ── Hero Metric Row ──────────────────────────────── -->
+      <section aria-labelledby="metrics-heading">
+        <h2 id="metrics-heading" class="visually-hidden">Current Sensor Readings</h2>
+
+        <div class="hero-row">
+
+          <!-- Overall AQI — Hero Card -->
+          <article class="card hero-aqi-card" aria-labelledby="aqi-hero-label">
+            <div class="card-label" id="aqi-hero-label">
+              <i class="fas fa-wind" aria-hidden="true"></i>
+              Overall AQI
+            </div>
+            <div class="card-value" id="overallAqiValue" aria-live="polite">
+              <span>--</span>
+            </div>
+            <div class="card-footer">
+              <span class="badge" id="overallAqiBadge">—</span>
+              <span style="font-size:0.8rem;color:rgba(255,255,255,0.6);" id="overallAqiText">Excellent</span>
+            </div>
+          </article>
+
+          <!-- PM2.5 -->
+          <article class="card" aria-labelledby="pm25-label">
+            <div class="card-label" id="pm25-label">
+              <i class="fas fa-smog" aria-hidden="true"></i>
+              PM2.5
+            </div>
+            <div class="card-value" id="pm25Value" aria-live="polite">
+              <span>--</span><span class="card-unit">μg/m³</span>
+            </div>
+            <div class="mini-bar">
+              <div class="mini-bar-fill fill-good" id="pm25Bar" style="width:10%"></div>
+            </div>
+            <div class="card-footer">
+              <span class="badge badge-good" id="pm25Badge">Good</span>
+              <span class="card-trend" id="pm25Text">Excellent</span>
+            </div>
+          </article>
+
+          <!-- CO2 -->
+          <article class="card" aria-labelledby="co2-label">
+            <div class="card-label" id="co2-label">
+              <i class="fas fa-cloud" aria-hidden="true"></i>
+              CO₂
+            </div>
+            <div class="card-value" id="co2Value" aria-live="polite">
+              <span>--</span><span class="card-unit">ppm</span>
+            </div>
+            <div class="mini-bar">
+              <div class="mini-bar-fill fill-good" id="co2Bar" style="width:30%"></div>
+            </div>
+            <div class="card-footer">
+              <span class="badge badge-good" id="co2Badge">Good</span>
+              <span class="card-trend" id="co2Text">Fresh Air</span>
+            </div>
+          </article>
+
+          <!-- CO -->
+          <article class="card" aria-labelledby="co-label">
+            <div class="card-label" id="co-label">
+              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              CO
+            </div>
+            <div class="card-value" id="coValue" aria-live="polite">
+              <span>--</span><span class="card-unit">ppm</span>
+            </div>
+            <div class="mini-bar">
+              <div class="mini-bar-fill fill-good" id="coBar" style="width:5%"></div>
+            </div>
+            <div class="card-footer">
+              <span class="badge badge-good" id="coBadge">Good</span>
+              <span class="card-trend" id="coText">Safe</span>
+            </div>
+          </article>
+
+          <!-- Temperature -->
+          <article class="card" aria-labelledby="temp-label">
+            <div class="card-label" id="temp-label">
+              <i class="fas fa-thermometer-half" aria-hidden="true"></i>
+              Temperature
+            </div>
+            <div class="card-value" id="tempValue" aria-live="polite">
+              <span>--</span><span class="card-unit">°C</span>
+            </div>
+            <div class="mini-bar">
+              <div class="mini-bar-fill fill-good" id="tempBar" style="width:55%"></div>
+            </div>
+            <div class="card-footer">
+              <span class="badge badge-good" id="tempBadge">Normal</span>
+              <span class="card-trend" id="tempText">Comfortable</span>
+            </div>
+          </article>
+
+          <!-- Humidity -->
+          <article class="card" aria-labelledby="hum-label">
+            <div class="card-label" id="hum-label">
+              <i class="fas fa-droplet" aria-hidden="true"></i>
+              Humidity
+            </div>
+            <div class="card-value" id="humValue" aria-live="polite">
+              <span>--</span><span class="card-unit">%</span>
+            </div>
+            <div class="mini-bar">
+              <div class="mini-bar-fill fill-good" id="humBar" style="width:50%"></div>
+            </div>
+            <div class="card-footer">
+              <span class="badge badge-good" id="humBadge">Normal</span>
+              <span class="card-trend" id="humText">Comfortable</span>
+            </div>
+          </article>
+
+        </div><!-- /hero-row -->
+      </section>
+
+      <!-- ── Charts Row ───────────────────────────────────── -->
+      <section class="charts-row" id="charts-section" aria-labelledby="charts-heading">
+        <h2 id="charts-heading" class="visually-hidden">Air Quality Charts</h2>
+
+        <!-- Trends Chart -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <div class="chart-card-title">Pollutant Trends</div>
+              <div class="chart-card-subtitle">PM2.5 · CO2 · CO — last 24 readings</div>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>PM2.5</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>CO₂</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>CO</span>
+            </div>
+          </div>
+          <div class="chart-body">
+            <canvas id="trendsChart" aria-label="Line chart of pollutant trends over time" role="img"></canvas>
+          </div>
+        </div>
+
+        <!-- Temp / Humidity Chart -->
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <div>
+              <div class="chart-card-title">Climate</div>
+              <div class="chart-card-subtitle">Temp · Humidity</div>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#f43f5e"></span>Temp</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#38bdf8"></span>RH%</span>
+            </div>
+          </div>
+          <div class="chart-body">
+            <canvas id="pollutantChart" aria-label="Line chart of temperature and humidity" role="img"></canvas>
+          </div>
+        </div>
+      </section>
+
+
+
+      <!-- ── Raw Data Stream ──────────────────────────────── -->
+      <section class="raw-panel" id="raw-panel" aria-labelledby="raw-heading">
+        <div class="raw-panel-header">
+          <span class="raw-panel-title">
+            <i class="fas fa-terminal" aria-hidden="true"></i>
+            Raw Sensor Stream
+          </span>
+          <button class="icon-btn" id="clearRaw" title="Clear stream" aria-label="Clear raw data stream">
+            <i class="fas fa-trash-can" aria-hidden="true" style="font-size:0.75rem"></i>
+          </button>
+        </div>
+        <div class="raw-panel-body" id="rawData" aria-live="polite" aria-label="Raw MQTT sensor data"></div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="app-footer" role="contentinfo" style="grid-column:1/-1">
+        <span>© 2026 AeroSense — Indoor Air Quality Monitoring System</span>
+        <span>Powered by ESP32 · MQTT · HiveMQ Cloud</span>
+      </footer>
+
+    </main><!-- /main-content -->
+  </div><!-- /app-shell -->
+
+  <!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+  <script>
+    /* ─────────────────────────────────────────────────────────────
+       THEME
+    ───────────────────────────────────────────────────────────── */
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.body.setAttribute('data-theme', theme);
+      themeIcon.className = theme === 'dark'
+        ? 'fas fa-sun'
+        : 'fas fa-moon';
+      localStorage.setItem('aerosense-theme', theme);
+    }
+
+    const savedTheme = localStorage.getItem('aerosense-theme') || 'dark';
+    applyTheme(savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      if (trendsChart) { trendsChart.destroy(); trendsChart = null; }
+      if (climateChart) { climateChart.destroy(); climateChart = null; }
+      initCharts();
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       MQTT CONFIGURATION
+    ───────────────────────────────────────────────────────────── */
+    const MQTT_HOST = "cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud";
+    const MQTT_PORT = 8884;
+    const MQTT_USERNAME = "adam1234";
+    const MQTT_PASSWORD = "Adam1234";
+    const MQTT_TOPIC = "esp32/sensor";
+    const MAX_HISTORY = 1440;
+
+    let mqttClient;
+
+    let dataHistory = {
+      timestamps: [],
+      pm25: [], co2: [], co: [], temperature: [], humidity: []
+    };
+
+    let trendsChart, climateChart;
+
+    /* ─────────────────────────────────────────────────────────────
+       PAYLOAD PARSER
+    ───────────────────────────────────────────────────────────── */
+    function parsePayload(payload) {
+      let raw = {};
+      try {
+        raw = JSON.parse(payload);
+      } catch (e) {
+        payload.split(',').forEach(pair => {
+          const [k, v] = pair.split(':');
+          if (k && v) raw[k.trim().toLowerCase()] = parseFloat(v);
+        });
+      }
+      return {
+        pm25: raw.pm25,
+        co2: raw.co2,
+        co: raw.co,
+        temperature: raw.temperature ?? raw.temp,
+        humidity: raw.humidity ?? raw.hum
+      };
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       AQI CLASSIFICATION HELPERS
+    ───────────────────────────────────────────────────────────── */
+    function classifyPm25(v) {
+      if (v <= 12) return { cls: 'good', label: 'Good', text: 'Excellent', pct: Math.min(v / 12 * 20, 100) };
+      if (v <= 35) return { cls: 'mod', label: 'Moderate', text: 'Acceptable', pct: 20 + (v - 12) / 23 * 40 };
+      return { cls: 'poor', label: 'Poor', text: 'Unhealthy', pct: 60 + Math.min((v - 35) / 20 * 40, 40) };
+    }
+    function classifyCo2(v) {
+      if (v <= 400) return { cls: 'good', label: 'Good', text: 'Fresh Air', pct: Math.min(v / 400 * 20, 100) };
+      if (v <= 1000) return { cls: 'mod', label: 'Moderate', text: 'Normal', pct: 20 + (v - 400) / 600 * 40 };
+      return { cls: 'poor', label: 'Poor', text: 'High', pct: 60 + Math.min((v - 1000) / 500 * 40, 40) };
+    }
+    function classifyCo(v) {
+      if (v <= 9) return { cls: 'good', label: 'Good', text: 'Safe', pct: Math.min(v / 9 * 15, 100) };
+      if (v <= 35) return { cls: 'mod', label: 'Moderate', text: 'Caution', pct: 15 + (v - 9) / 26 * 45 };
+      return { cls: 'poor', label: 'Poor', text: 'Dangerous', pct: 60 + Math.min((v - 35) / 20 * 40, 40) };
+    }
+    function classifyTemp(v) {
+      if (v >= 18 && v <= 25) return { cls: 'good', label: 'Comfortable', text: 'Ideal', pct: 60 };
+      if ((v >= 10 && v < 18) || (v > 25 && v <= 30)) return { cls: 'mod', label: 'Moderate', text: 'Fair', pct: 35 };
+      return { cls: 'poor', label: 'Extreme', text: 'Uncomfortable', pct: 85 };
+    }
+    function classifyHum(v) {
+      if (v >= 30 && v <= 60) return { cls: 'good', label: 'Normal', text: 'Comfortable', pct: v };
+      if ((v >= 20 && v < 30) || (v > 60 && v <= 70)) return { cls: 'mod', label: 'Moderate', text: 'Fair', pct: v };
+      return { cls: 'poor', label: 'High/Low', text: 'Uncomfortable', pct: v };
+    }
+    function classifyAqi(v) {
+      if (v <= 50) return { cls: 'good', label: 'Good', text: 'Excellent', pct: v };
+      if (v <= 100) return { cls: 'mod', label: 'Moderate', text: 'Acceptable', pct: v };
+      return { cls: 'poor', label: 'Poor', text: 'Unhealthy', pct: Math.min(v, 100) };
+    }
+    function calcAqi(data) {
+      return Math.max(data.pm25 || 0, (data.co2 || 0) / 10, (data.co || 0) * 5);
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       DOM UPDATER HELPERS
+    ───────────────────────────────────────────────────────────── */
+    function setVal(id, val) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = val;
+      el.classList.remove('data-update');
+      void el.offsetWidth; // reflow to retrigger animation
+      el.classList.add('data-update');
+      setTimeout(() => el.classList.remove('data-update'), 600);
+    }
+
+    function setBadge(id, info) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = `badge badge-${info.cls}`;
+      el.textContent = info.label;
+    }
+
+    function setBar(id, info) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.width = `${Math.min(info.pct, 100)}%`;
+      el.className = `mini-bar-fill fill-${info.cls}`;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       UPDATE DASHBOARD
+    ───────────────────────────────────────────────────────────── */
+    function updateDashboard(data) {
+      // PM2.5
+      if (data.pm25 !== undefined) {
+        const i = classifyPm25(data.pm25);
+        setVal('pm25Value', `${data.pm25.toFixed(1)} μg/m³`);
+        setBadge('pm25Badge', i);
+        setBar('pm25Bar', i);
+        document.getElementById('pm25Text').textContent = i.text;
+      }
+      // CO2
+      if (data.co2 !== undefined) {
+        const i = classifyCo2(data.co2);
+        setVal('co2Value', `${data.co2.toFixed(0)} ppm`);
+        setBadge('co2Badge', i);
+        setBar('co2Bar', i);
+        document.getElementById('co2Text').textContent = i.text;
+      }
+      // CO
+      if (data.co !== undefined) {
+        const i = classifyCo(data.co);
+        setVal('coValue', `${data.co.toFixed(0)} ppm`);
+        setBadge('coBadge', i);
+        setBar('coBar', i);
+        document.getElementById('coText').textContent = i.text;
+      }
+      // Temp
+      if (data.temperature !== undefined) {
+        const i = classifyTemp(data.temperature);
+        setVal('tempValue', `${data.temperature.toFixed(1)} °C`);
+        setBadge('tempBadge', i);
+        setBar('tempBar', i);
+        document.getElementById('tempText').textContent = i.text;
+      }
+      // Humidity
+      if (data.humidity !== undefined) {
+        const i = classifyHum(data.humidity);
+        setVal('humValue', `${data.humidity.toFixed(1)} %`);
+        setBadge('humBadge', i);
+        setBar('humBar', i);
+        document.getElementById('humText').textContent = i.text;
+      }
+      // Overall AQI (hero)
+      const aqi = calcAqi(data);
+      const aqiInfo = classifyAqi(aqi);
+      setVal('overallAqiValue', aqi.toFixed(0));
+      setBadge('overallAqiBadge', aqiInfo);
+      document.getElementById('overallAqiText').textContent = aqiInfo.text;
+
+
+      // Last update
+      const now = new Date();
+      document.getElementById('lastUpdateText').textContent =
+        `Updated ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       CHART HELPERS
+    ───────────────────────────────────────────────────────────── */
+    function getChartColors() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      return {
+        text: isDark ? '#8b95a8' : '#6b7280',
+        grid: isDark ? '#1f2330' : '#f1f3f6',
+        bg: isDark ? '#111318' : '#ffffff',
+      };
+    }
+
+    function makeGradient(ctx, colorStop1, colorStop2, alpha1 = 0.2, alpha2 = 0) {
+      const grad = ctx.createLinearGradient(0, 0, 0, 260);
+      grad.addColorStop(0, colorStop1.replace(')', `,${alpha1})`).replace('rgb', 'rgba'));
+      grad.addColorStop(1, colorStop2.replace(')', `,${alpha2})`).replace('rgb', 'rgba'));
+      return grad;
+    }
+
+    const chartDefaults = () => {
+      const c = getChartColors();
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 400, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: c.bg,
+            borderColor: c.grid,
+            borderWidth: 1,
+            titleColor: c.text,
+            bodyColor: c.text,
+            titleFont: { family: 'Inter', weight: '600', size: 12 },
+            bodyFont: { family: 'Inter', size: 12 },
+            padding: 12,
+            cornerRadius: 8,
+            boxPadding: 4,
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: c.grid, drawBorder: false },
+            ticks: { color: c.text, font: { family: 'Inter', size: 11 }, maxTicksLimit: 8 },
+            border: { display: false }
+          },
+          y: {
+            grid: { color: c.grid, drawBorder: false },
+            ticks: { color: c.text, font: { family: 'Inter', size: 11 } },
+            border: { display: false }
+          }
+        }
+      };
+    };
+
+    function initCharts() {
+      const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+      const climateCtx = document.getElementById('pollutantChart').getContext('2d');
+      const labels = getPastLabels(24);
+
+      // ── Trends Chart ─────────────────────────────────────────
+      trendsChart = new Chart(trendsCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'PM2.5 (μg/m³)',
+              data: Array.from({ length: 24 }, () => +(Math.random() * 20 + 8).toFixed(1)),
+              borderColor: '#10b981',
+              backgroundColor: createGradientHelper(trendsCtx, '#10b981'),
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.45,
+              fill: true
+            },
+            {
+              label: 'CO₂ (ppm)',
+              data: Array.from({ length: 24 }, () => +(Math.random() * 300 + 400).toFixed(0)),
+              borderColor: '#6366f1',
+              backgroundColor: createGradientHelper(trendsCtx, '#6366f1'),
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.45,
+              fill: true,
+              hidden: false
+            },
+            {
+              label: 'CO (ppm)',
+              data: Array.from({ length: 24 }, () => +(Math.random() * 6 + 2).toFixed(1)),
+              borderColor: '#f59e0b',
+              backgroundColor: createGradientHelper(trendsCtx, '#f59e0b'),
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.45,
+              fill: true
+            }
+          ]
+        },
+        options: chartDefaults()
+      });
+
+      // ── Climate Chart ─────────────────────────────────────────
+      const climateOpts = chartDefaults();
+      climateOpts.scales.y1 = {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        ticks: { color: getChartColors().text, font: { family: 'Inter', size: 11 } },
+        border: { display: false },
+        min: 0, max: 100
+      };
+      climateOpts.scales.y.min = 10;
+      climateOpts.scales.y.max = 45;
+
+      climateChart = new Chart(climateCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Temperature (°C)',
+              data: Array.from({ length: 24 }, () => +(Math.random() * 8 + 22).toFixed(1)),
+              borderColor: '#f43f5e',
+              backgroundColor: createGradientHelper(climateCtx, '#f43f5e'),
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.45,
+              fill: true,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Humidity (%)',
+              data: Array.from({ length: 24 }, () => +(Math.random() * 20 + 55).toFixed(1)),
+              borderColor: '#38bdf8',
+              backgroundColor: createGradientHelper(climateCtx, '#38bdf8'),
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.45,
+              fill: true,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: climateOpts
+      });
+    }
+
+    function createGradientHelper(ctx, hexColor) {
+      try {
+        const grad = ctx.createLinearGradient(0, 0, 0, 260);
+        grad.addColorStop(0, hexColor + '33');
+        grad.addColorStop(1, hexColor + '00');
+        return grad;
+      } catch (e) {
+        return hexColor + '22';
+      }
+    }
+
+    function getPastLabels(count) {
+      const now = new Date();
+      return Array.from({ length: count }, (_, i) => {
+        const d = new Date(now - (count - 1 - i) * 60000);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+    }
+
+    function updateCharts(data) {
+      const now = new Date();
+      const label = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      if (data.pm25 !== undefined) dataHistory.pm25.push(data.pm25);
+      if (data.co2 !== undefined) dataHistory.co2.push(data.co2);
+      if (data.co !== undefined) dataHistory.co.push(data.co);
+      if (data.temperature !== undefined) dataHistory.temperature.push(data.temperature);
+      if (data.humidity !== undefined) dataHistory.humidity.push(data.humidity);
+      dataHistory.timestamps.push(label);
+
+      if (dataHistory.timestamps.length > MAX_HISTORY) {
+        ['timestamps', 'pm25', 'co2', 'co', 'temperature', 'humidity'].forEach(k => dataHistory[k].shift());
+      }
+
+      if (trendsChart) {
+        trendsChart.data.labels = dataHistory.timestamps;
+        trendsChart.data.datasets[0].data = dataHistory.pm25;
+        trendsChart.data.datasets[1].data = dataHistory.co2;
+        trendsChart.data.datasets[2].data = dataHistory.co;
+        trendsChart.update('none');
+      }
+      if (climateChart) {
+        climateChart.data.labels = dataHistory.timestamps;
+        climateChart.data.datasets[0].data = dataHistory.temperature;
+        climateChart.data.datasets[1].data = dataHistory.humidity;
+        climateChart.update('none');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────────────────────
+       RAW DATA
+    ───────────────────────────────────────────────────────────── */
+    function appendRaw(msg) {
+      const el = document.getElementById('rawData');
+      const ts = new Date().toLocaleTimeString([], { hour12: false });
+      el.innerHTML += `<span style="color:var(--text-tertiary)">[${ts}]</span> ${msg}\n`;
+      if (el.children.length > 80) el.innerHTML = el.innerHTML.split('\n').slice(-60).join('\n');
+      el.scrollTop = el.scrollHeight;
+    }
+
+    document.getElementById('clearRaw').addEventListener('click', () => {
+      document.getElementById('rawData').innerHTML = '';
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       MQTT
+    ───────────────────────────────────────────────────────────── */
+    function connectMqtt() {
+      mqttClient = mqtt.connect(`wss://${MQTT_HOST}:${MQTT_PORT}/mqtt`, {
+        username: MQTT_USERNAME,
+        password: MQTT_PASSWORD,
+        clean: true,
+        reconnectPeriod: 2000,
+        connectTimeout: 30000
+      });
+
+      mqttClient.on('connect', () => {
+        document.getElementById('connDot').classList.add('connected');
+        document.getElementById('connStatus').textContent = 'Connected';
+        mqttClient.subscribe(MQTT_TOPIC);
+      });
+
+      mqttClient.on('message', (topic, message) => {
+        try {
+          const raw = message.toString();
+          const data = parsePayload(raw);
+          updateDashboard(data);
+          updateCharts(data);
+          appendRaw(raw);
+        } catch (e) {
+          console.error('MQTT parse error:', e);
+        }
+      });
+
+      mqttClient.on('error', () => {
+        document.getElementById('connStatus').textContent = 'Error';
+      });
+
+      mqttClient.on('offline', () => {
+        document.getElementById('connDot').classList.remove('connected');
+        document.getElementById('connStatus').textContent = 'Reconnecting…';
+      });
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       WAQI PUBLIC API — FALLBACK / REAL DATA
+    ───────────────────────────────────────────────────────────── */
+    const API_KEY = '147cf1a1470c2ce162064997dfa53119f42e2adb';
+    const CITIES = ['delhi', 'london'];
+    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+    let realSensors = [];
+
+    async function fetchWaqi(city) {
+      const url = CORS_PROXY + encodeURIComponent(`https://api.waqi.info/feed/${city}/?token=${API_KEY}`);
+      try {
+        const r = await Promise.race([
+          fetch(url),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+        ]);
+        const d = await r.json();
+        return d.status === 'ok' ? d.data : null;
+      } catch (e) { return null; }
+    }
+
+    async function refreshApiData() {
+      const pill = document.getElementById('apiPill');
+      pill.textContent = 'API: …';
+      pill.className = 'api-pill';
+
+      const results = await Promise.allSettled(CITIES.map(fetchWaqi));
+      realSensors = results
+        .map((r, i) => r.status === 'fulfilled' && r.value ? processApiSensor(CITIES[i], r.value) : null)
+        .filter(Boolean);
+
+      if (realSensors.length) {
+        pill.textContent = `API: ${realSensors.length}/${CITIES.length} Online`;
+      } else {
+        pill.textContent = 'API: Demo Mode';
+        pill.className = 'api-pill offline';
+      }
+    }
+
+    const BASE_LAT = 9.211889407438802, BASE_LNG = 76.642251169034;
+    function processApiSensor(city, d) {
+      return {
+        name: city.charAt(0).toUpperCase() + city.slice(1),
+        lat: BASE_LAT + (Math.random() * 0.002 - 0.001),
+        lng: BASE_LNG + (Math.random() * 0.002 - 0.001),
+        aqi: d.aqi || 0,
+        pm25: d.iaqi?.pm25?.v || 0,
+        temperature: d.iaqi?.t?.v || 28,
+        humidity: d.iaqi?.h?.v || 65,
+        status: d.aqi <= 50 ? 'good' : d.aqi <= 100 ? 'moderate' : 'poor'
+      };
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       REFRESH BUTTON
+    ───────────────────────────────────────────────────────────── */
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      refreshApiData();
+    });
+
+    /* ─────────────────────────────────────────────────────────────
+       INIT
+    ───────────────────────────────────────────────────────────── */
+    window.addEventListener('load', () => {
+      initCharts();
+      connectMqtt();
+      refreshApiData();
+      // Refresh API every 2 min
+      setInterval(refreshApiData, 120000);
+    });
+  </script>
+
+</body>
+
+</html>
