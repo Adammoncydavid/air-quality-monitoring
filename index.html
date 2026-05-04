@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AeroSense — Indoor Air Quality Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍃</text></svg>">
   <meta name="description"
     content="Real-time indoor air quality monitoring dashboard powered by IoT sensors and AI. Monitor PM2.5, CO2, CO, temperature, and humidity." />
 
@@ -24,7 +25,9 @@
   <!-- ══════════════════════════════════════════════════════════
      APP SHELL
 ══════════════════════════════════════════════════════════ -->
-  <div class="app-shell">
+
+
+<div class="app-shell">
 
     <!-- ── Top Navigation ─────────────────────────────────── -->
     <header class="topbar" role="banner">
@@ -107,6 +110,15 @@
           <h1>Air Quality Dashboard</h1>
           <p>Real-time monitoring · ESP32 + MQTT · IoT + AI</p>
         </div>
+        <a href="aerosense_v1.apk" download class="download-btn" title="Download AeroSense Android App">
+          📱 Download App
+        </a>
+      </div>
+
+      <!-- Sensor offline notice — shown after 15 s with no MQTT data -->
+      <div class="sensor-notice" id="sensorNotice" style="display:none" role="alert" aria-live="polite">
+        <i class="fas fa-satellite-dish" aria-hidden="true"></i>
+        Waiting for sensor data — ensure the ESP32 is powered on and connected to MQTT.
       </div>
 
       <!-- ── Hero Metric Row ──────────────────────────────── -->
@@ -232,7 +244,7 @@
           <div class="chart-card-header">
             <div>
               <div class="chart-card-title">Pollutant Trends</div>
-              <div class="chart-card-subtitle">PM2.5 · CO2 · CO — last 24 readings</div>
+              <div class="chart-card-subtitle">PM2.5 · CO₂ · CO — awaiting live sensor data</div>
             </div>
             <div class="chart-legend">
               <span class="legend-item"><span class="legend-dot" style="background:#10b981"></span>PM2.5</span>
@@ -250,7 +262,7 @@
           <div class="chart-card-header">
             <div>
               <div class="chart-card-title">Climate</div>
-              <div class="chart-card-subtitle">Temp · Humidity</div>
+              <div class="chart-card-subtitle">Temp · Humidity — awaiting live sensor data</div>
             </div>
             <div class="chart-legend">
               <span class="legend-item"><span class="legend-dot" style="background:#f43f5e"></span>Temp</span>
@@ -276,7 +288,9 @@
             <i class="fas fa-trash-can" aria-hidden="true" style="font-size:0.75rem"></i>
           </button>
         </div>
-        <div class="raw-panel-body" id="rawData" aria-live="polite" aria-label="Raw MQTT sensor data"></div>
+        <div class="raw-panel-body" id="rawData" aria-live="polite" aria-label="Raw MQTT sensor data">
+          <div style="color:var(--text-tertiary);font-style:italic">Waiting for MQTT messages from ESP32…</div>
+        </div>
       </section>
 
       <!-- Footer -->
@@ -320,16 +334,21 @@
     });
 
     /* ─────────────────────────────────────────────────────────────
-       MQTT CONFIGURATION
+       CONFIGURATION
+       ⚠️  SECURITY: These credentials are visible in page source.
+       Before deploying publicly:
+         1. Create a subscribe-only MQTT user on HiveMQ for this page.
+         2. Move API keys to a server-side proxy / environment variable.
     ───────────────────────────────────────────────────────────── */
-    const MQTT_HOST = "cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud";
-    const MQTT_PORT = 8884;
+    const MQTT_HOST     = "cd29a7c955164a079ab779cab2f382d7.s1.eu.hivemq.cloud";
+    const MQTT_PORT     = 8884;
     const MQTT_USERNAME = "adam1234";
     const MQTT_PASSWORD = "Adam1234";
-    const MQTT_TOPIC = "esp32/sensor";
-    const MAX_HISTORY = 1440;
+    const MQTT_TOPIC    = "esp32/sensor";
+    const MAX_HISTORY   = 1440;
 
     let mqttClient;
+    let dataReceived = false; // set true on first MQTT message
 
     let dataHistory = {
       timestamps: [],
@@ -494,12 +513,7 @@
       };
     }
 
-    function makeGradient(ctx, colorStop1, colorStop2, alpha1 = 0.2, alpha2 = 0) {
-      const grad = ctx.createLinearGradient(0, 0, 0, 260);
-      grad.addColorStop(0, colorStop1.replace(')', `,${alpha1})`).replace('rgb', 'rgba'));
-      grad.addColorStop(1, colorStop2.replace(')', `,${alpha2})`).replace('rgb', 'rgba'));
-      return grad;
-    }
+
 
     const chartDefaults = () => {
       const c = getChartColors();
@@ -541,59 +555,70 @@
     function initCharts() {
       const trendsCtx = document.getElementById('trendsChart').getContext('2d');
       const climateCtx = document.getElementById('pollutantChart').getContext('2d');
-      const labels = getPastLabels(24);
+      const c = getChartColors();
 
       // ── Trends Chart ─────────────────────────────────────────
+      // Starts EMPTY — fills only with real incoming MQTT data.
+      // CO₂ uses its own right-side axis so PM2.5 and CO stay visible.
+      const trendsOpts = chartDefaults();
+      trendsOpts.scales.y.min = 0;
+      trendsOpts.scales.y.title = {
+        display: true, text: 'μg/m³ & CO (ppm)',
+        color: c.text, font: { family: 'Inter', size: 10 }
+      };
+      trendsOpts.scales.yCO2 = {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        border: { display: false },
+        min: 300, max: 1500,
+        ticks: { color: c.text, font: { family: 'Inter', size: 11 } },
+        title: {
+          display: true, text: 'CO₂ (ppm)',
+          color: '#6366f1', font: { family: 'Inter', size: 10 }
+        }
+      };
+
       trendsChart = new Chart(trendsCtx, {
         type: 'line',
         data: {
-          labels,
+          labels: [],       // populated by real MQTT data via updateCharts()
           datasets: [
             {
               label: 'PM2.5 (μg/m³)',
-              data: Array.from({ length: 24 }, () => +(Math.random() * 20 + 8).toFixed(1)),
+              data: [],     // real data only
               borderColor: '#10b981',
               backgroundColor: createGradientHelper(trendsCtx, '#10b981'),
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 5,
-              tension: 0.45,
-              fill: true
+              borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
+              tension: 0.45, fill: true, yAxisID: 'y'
             },
             {
               label: 'CO₂ (ppm)',
-              data: Array.from({ length: 24 }, () => +(Math.random() * 300 + 400).toFixed(0)),
+              data: [],     // real data only
               borderColor: '#6366f1',
               backgroundColor: createGradientHelper(trendsCtx, '#6366f1'),
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 5,
-              tension: 0.45,
-              fill: true,
-              hidden: false
+              borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
+              tension: 0.45, fill: true, yAxisID: 'yCO2'
             },
             {
               label: 'CO (ppm)',
-              data: Array.from({ length: 24 }, () => +(Math.random() * 6 + 2).toFixed(1)),
+              data: [],     // real data only
               borderColor: '#f59e0b',
               backgroundColor: createGradientHelper(trendsCtx, '#f59e0b'),
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 5,
-              tension: 0.45,
-              fill: true
+              borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
+              tension: 0.45, fill: true, yAxisID: 'y'
             }
           ]
         },
-        options: chartDefaults()
+        options: trendsOpts
       });
 
       // ── Climate Chart ─────────────────────────────────────────
+      // Starts EMPTY — fills only with real incoming MQTT data.
       const climateOpts = chartDefaults();
       climateOpts.scales.y1 = {
         position: 'right',
         grid: { drawOnChartArea: false },
-        ticks: { color: getChartColors().text, font: { family: 'Inter', size: 11 } },
+        ticks: { color: c.text, font: { family: 'Inter', size: 11 } },
         border: { display: false },
         min: 0, max: 100
       };
@@ -603,31 +628,23 @@
       climateChart = new Chart(climateCtx, {
         type: 'line',
         data: {
-          labels,
+          labels: [],       // populated by real MQTT data via updateCharts()
           datasets: [
             {
               label: 'Temperature (°C)',
-              data: Array.from({ length: 24 }, () => +(Math.random() * 8 + 22).toFixed(1)),
+              data: [],     // real data only
               borderColor: '#f43f5e',
               backgroundColor: createGradientHelper(climateCtx, '#f43f5e'),
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              tension: 0.45,
-              fill: true,
-              yAxisID: 'y'
+              borderWidth: 2, pointRadius: 2, pointHoverRadius: 4,
+              tension: 0.45, fill: true, yAxisID: 'y'
             },
             {
               label: 'Humidity (%)',
-              data: Array.from({ length: 24 }, () => +(Math.random() * 20 + 55).toFixed(1)),
+              data: [],     // real data only
               borderColor: '#38bdf8',
               backgroundColor: createGradientHelper(climateCtx, '#38bdf8'),
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              tension: 0.45,
-              fill: true,
-              yAxisID: 'y1'
+              borderWidth: 2, pointRadius: 2, pointHoverRadius: 4,
+              tension: 0.45, fill: true, yAxisID: 'y1'
             }
           ]
         },
@@ -656,7 +673,7 @@
 
     function updateCharts(data) {
       const now = new Date();
-      const label = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const label = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       if (data.pm25 !== undefined) dataHistory.pm25.push(data.pm25);
       if (data.co2 !== undefined) dataHistory.co2.push(data.co2);
@@ -669,17 +686,24 @@
         ['timestamps', 'pm25', 'co2', 'co', 'temperature', 'humidity'].forEach(k => dataHistory[k].shift());
       }
 
+      const count = dataHistory.timestamps.length;
+
       if (trendsChart) {
         trendsChart.data.labels = dataHistory.timestamps;
         trendsChart.data.datasets[0].data = dataHistory.pm25;
         trendsChart.data.datasets[1].data = dataHistory.co2;
         trendsChart.data.datasets[2].data = dataHistory.co;
+        // Update subtitle once live data arrives
+        const tSub = document.querySelectorAll('.chart-card-subtitle')[0];
+        if (tSub) tSub.textContent = `PM2.5 · CO₂ · CO — Live · ${count} reading${count === 1 ? '' : 's'}`;
         trendsChart.update('none');
       }
       if (climateChart) {
         climateChart.data.labels = dataHistory.timestamps;
         climateChart.data.datasets[0].data = dataHistory.temperature;
         climateChart.data.datasets[1].data = dataHistory.humidity;
+        const cSub = document.querySelectorAll('.chart-card-subtitle')[1];
+        if (cSub) cSub.textContent = `Temp · Humidity — Live · ${count} reading${count === 1 ? '' : 's'}`;
         climateChart.update('none');
       }
     }
@@ -688,11 +712,25 @@
     /* ─────────────────────────────────────────────────────────────
        RAW DATA
     ───────────────────────────────────────────────────────────── */
+    let rawPlaceholderCleared = false;
     function appendRaw(msg) {
       const el = document.getElementById('rawData');
+      // Remove the "waiting" placeholder on first real message
+      if (!rawPlaceholderCleared) {
+        el.innerHTML = '';
+        rawPlaceholderCleared = true;
+      }
       const ts = new Date().toLocaleTimeString([], { hour12: false });
-      el.innerHTML += `<span style="color:var(--text-tertiary)">[${ts}]</span> ${msg}\n`;
-      if (el.children.length > 80) el.innerHTML = el.innerHTML.split('\n').slice(-60).join('\n');
+      const line = document.createElement('div');
+      const tsSpan = document.createElement('span');
+      tsSpan.style.color = 'var(--text-tertiary)';
+      tsSpan.textContent = `[${ts}]`;
+      const msgNode = document.createTextNode(` ${msg}`);
+      line.appendChild(tsSpan);
+      line.appendChild(msgNode);
+      el.appendChild(line);
+      // Keep at most 60 lines
+      while (el.children.length > 60) el.removeChild(el.firstChild);
       el.scrollTop = el.scrollHeight;
     }
 
@@ -722,6 +760,8 @@
         try {
           const raw = message.toString();
           const data = parsePayload(raw);
+          dataReceived = true; // hide sensor notice
+          document.getElementById('sensorNotice').style.display = 'none';
           updateDashboard(data);
           updateCharts(data);
           appendRaw(raw);
@@ -809,6 +849,12 @@
       refreshApiData();
       // Refresh API every 2 min
       setInterval(refreshApiData, 120000);
+      // Show offline notice if no sensor data arrives in 15 s
+      setTimeout(() => {
+        if (!dataReceived) {
+          document.getElementById('sensorNotice').style.display = 'flex';
+        }
+      }, 15000);
     });
   </script>
 
